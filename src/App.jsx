@@ -14,35 +14,48 @@ const App = () => {
       .then(csvText => {
         const filas = csvText.split(/\r?\n/);
         const diccionario = {};
+        
         filas.forEach((fila) => {
           const c = fila.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
           if (c.length < 50) return;
           
-          const id = c[2]?.replace(/"/g, '').trim();      // Columna C: ID
-          const nombre = c[0]?.replace(/"/g, '').trim();  // Columna A: Nombre
-          const materia = c[9]?.replace(/"/g, '').trim(); // Columna J: Materia
-          const creditos = c[10]?.replace(/"/g, '').trim(); // Columna K: Créditos
-          const grupo = c[11]?.replace(/"/g, '').trim();  // Columna L: Grupo
-          const cupos = c[12]?.replace(/"/g, '').trim();  // Columna M: Cupos
-          const fInicio = c[15]?.replace(/"/g, '').trim(); // Columna P: Inicio
-          const fFin = c[16]?.replace(/"/g, '').trim();   // Columna Q: Fin
+          const id = c[2]?.replace(/"/g, '').trim(); // ID en Columna C
+          const nombre = c[0]?.replace(/"/g, '').trim(); // Nombre en Columna A
+          const materia = c[9]?.replace(/"/g, '').trim(); // Materia en Columna J
+          const creditos = c[10]?.replace(/"/g, '').trim();
+          const grupo = c[11]?.replace(/"/g, '').trim();
+          const cupos = c[12]?.replace(/"/g, '').trim();
 
           const semanas = [];
-          for (let i = 55; i <= 62; i++) {
-            const texto = c[i]?.replace(/"/g, '').trim() || "-";
-            const matchId = texto.match(/ID\s*-\s*(\d+)/i) || texto.match(/ID\s*(\d+)/i);
-            const zoomId = matchId ? matchId[1] : null;
-            const partes = texto.split('-');
-            semanas.push({
-              fecha: partes[0] || "Pendiente",
-              hora: partes[1] || "Horario no definido",
-              zoomLink: zoomId ? `https://zoom.us/j/${zoomId}` : null,
-              zoomId: zoomId
-            });
+          for (let i = 55; i <= 62; i++) { // BD a BK
+            const texto = c[i]?.replace(/"/g, '').trim() || "";
+            if (texto && texto !== "-") {
+              // 1. Extraer ID de Zoom (busca el número después de "ID -")
+              const zoomMatch = texto.match(/ID\s*-\s*(\d+)/i);
+              const zoomId = zoomMatch ? zoomMatch[1] : null;
+
+              // 2. Extraer Hora (busca el patrón "XX A XX")
+              const horaMatch = texto.match(/(\d{1,2}\s*A\s*\d{1,2})/i);
+              const horaFinal = horaMatch ? horaMatch[0] : "Ver descripción";
+
+              // 3. Extraer Fecha (lo que está antes del primer guion o los primeros 20 caracteres)
+              const fechaFinal = texto.split('-')[0].trim();
+
+              semanas.push({
+                fecha: fechaFinal,
+                hora: horaFinal,
+                zoomLink: zoomId ? `https://zoom.us/j/${zoomId}` : null,
+                zoomId: zoomId,
+                detalleCompleto: texto
+              });
+            } else {
+              semanas.push({ fecha: "Sin sesión", hora: "-", zoomLink: null });
+            }
           }
+
           if (id && !isNaN(id)) {
             if (!diccionario[id]) diccionario[id] = { nombre, cursos: [] };
-            diccionario[id].cursos.push({ materia, grupo, creditos, cupos, fInicio, fFin, semanas });
+            diccionario[id].cursos.push({ materia, grupo, creditos, cupos, semanas });
           }
         });
         setState({ loading: false, teachers: diccionario });
@@ -58,91 +71,47 @@ const App = () => {
     if (state.teachers[idLimpio]) {
       setSelectedId(idLimpio);
       setSelectedCursoIdx(0);
-    } else { alert("Identificación no registrada."); }
+    } else { alert("Cédula no encontrada."); }
   };
 
-  if (state.loading) return <div className="loading-state"><span>Sincronizando con la nube...</span></div>;
+  if (state.loading) return <div className="loading-state">Optimizando datos para Unimagdalena...</div>;
 
   return (
     <div className="modern-portal">
       <style>{`
         #root { width: 100% !important; max-width: 100% !important; margin: 0 !important; }
-        .modern-portal { background: #f3f4f6; min-height: 100vh; font-family: 'Inter', sans-serif; color: #1f2937; }
-        
-        /* HEADER PREMIUM */
-        .portal-header { background: linear-gradient(135deg, #004A87 0%, #002d52 100%); color: white; padding: 25px 20px; border-bottom: 4px solid #D4AF37; }
-        .header-inner { max-width: 1300px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
-        .logo-box h1 { margin: 0; font-size: 1.6rem; font-weight: 900; letter-spacing: -0.5px; }
-        .logo-box p { margin: 0; color: #D4AF37; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
-        
-        /* SEARCH ENGINE */
-        .search-container { background: rgba(255,255,255,0.1); padding: 5px; border-radius: 12px; display: flex; backdrop-filter: blur(10px); }
-        .search-container input { border: none; background: white; padding: 12px 15px; border-radius: 8px; width: 220px; outline: none; font-weight: 600; }
-        .search-container button { background: #D4AF37; color: #004A87; border: none; margin-left: 5px; padding: 0 20px; border-radius: 8px; font-weight: 900; cursor: pointer; transition: 0.3s; }
-        .search-container button:hover { background: white; }
-
-        /* MAIN CONTENT AREA */
-        .portal-body { max-width: 1300px; margin: 40px auto; padding: 0 20px; display: grid; grid-template-columns: 350px 1fr; gap: 30px; }
-        @media (max-width: 1024px) { .portal-body { grid-template-columns: 1fr; } }
-
-        /* SIDEBAR PROFESIONAL */
-        .sidebar-card { background: white; border-radius: 24px; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.03); height: fit-content; }
-        .teacher-profile { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #f3f4f6; padding-bottom: 25px; }
-        .initials { width: 70px; height: 70px; background: #004A87; color: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 900; margin: 0 auto 15px; transform: rotate(-5deg); box-shadow: 0 10px 20px rgba(0,74,135,0.2); }
-        .teacher-profile h3 { margin: 0; font-size: 1.1rem; color: #004A87; }
-        .teacher-profile span { font-size: 0.75rem; color: #D4AF37; font-weight: bold; }
-
-        .nav-title { font-size: 0.7rem; font-weight: 900; color: #9ca3af; margin-bottom: 15px; letter-spacing: 1px; }
-        .course-btn { width: 100%; text-align: left; background: #fff; border: 2px solid #f3f4f6; padding: 18px; border-radius: 16px; margin-bottom: 12px; cursor: pointer; transition: 0.4s; }
-        .course-btn.active { border-color: #D4AF37; background: #fffdf5; transform: scale(1.03); box-shadow: 0 10px 20px rgba(212,175,55,0.1); }
-        .course-btn b { display: block; color: #004A87; font-size: 0.9rem; margin-bottom: 5px; }
-        .course-btn i { font-size: 0.75rem; color: #6b7280; font-style: normal; }
-
-        /* DASHBOARD CONTENT */
-        .dashboard-main { background: white; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.03); }
-        .dash-header { background: #004A87; color: white; padding: 40px; position: relative; overflow: hidden; }
-        .dash-header h2 { position: relative; z-index: 2; margin: 0; font-size: 1.8rem; font-weight: 900; }
-        .dash-header::after { content: 'CREO'; position: absolute; right: -20px; bottom: -20px; font-size: 8rem; font-weight: 900; opacity: 0.05; }
-        
-        .grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); background: #fafafa; border-bottom: 1px solid #f3f4f6; }
-        .stat-card { padding: 25px; text-align: center; border-right: 1px solid #f3f4f6; }
-        .stat-card label { display: block; font-size: 0.65rem; color: #9ca3af; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; }
-        .stat-card span { font-size: 1.4rem; font-weight: 900; color: #004A87; }
-
-        .weeks-section { padding: 40px; }
-        .section-header { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; }
-        .line { height: 3px; flex: 1; background: #f3f4f6; }
-        .section-header h3 { margin: 0; font-size: 1.1rem; color: #374151; font-weight: 800; }
-
-        .weeks-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
-        .week-item { background: #fff; border: 2px solid #f3f4f6; border-radius: 20px; padding: 20px; transition: 0.3s; }
-        .week-item:hover { border-color: #D4AF37; box-shadow: 0 10px 20px rgba(0,0,0,0.02); }
-        .week-num { background: #f3f4f6; display: inline-block; padding: 4px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: 900; color: #004A87; margin-bottom: 15px; }
-        
-        .info-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.85rem; color: #4b5563; }
-        .info-row strong { color: #1f2937; }
-
-        .zoom-button { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; background: #2D8CFF; color: white; padding: 12px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 0.8rem; transition: 0.3s; }
-        .zoom-button:hover { background: #0070f3; transform: translateY(-2px); }
-
-        .dash-footer { background: #f9fafb; padding: 20px 40px; border-top: 1px solid #f3f4f6; display: flex; justify-content: space-between; font-size: 0.75rem; color: #9ca3af; }
-        
-        .welcome-page { grid-column: 1 / -1; text-align: center; padding: 120px 20px; }
-        .welcome-page h2 { font-size: 2rem; color: #004a87; margin-bottom: 10px; }
-        .loading-state { height: 100vh; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #004a87; letter-spacing: 2px; }
+        .modern-portal { background: #f8fafc; min-height: 100vh; font-family: 'Inter', sans-serif; }
+        .portal-header { background: #004A87; color: white; padding: 20px; border-bottom: 4px solid #D4AF37; }
+        .header-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .search-box { background: white; padding: 5px; border-radius: 10px; display: flex; border: 1px solid #ddd; }
+        .search-box input { border: none; padding: 8px 15px; outline: none; width: 200px; }
+        .search-box button { background: #004A87; color: white; border: none; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .portal-body { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: grid; grid-template-columns: 320px 1fr; gap: 30px; }
+        @media (max-width: 900px) { .portal-body { grid-template-columns: 1fr; } }
+        .sidebar { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .course-btn { width: 100%; text-align: left; background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 12px; margin-bottom: 10px; cursor: pointer; }
+        .course-btn.active { border-color: #D4AF37; background: #fffdf5; }
+        .main-dash { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .dash-top { background: #004A87; color: white; padding: 25px; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); background: #fafafa; border-bottom: 1px solid #eee; }
+        .stat { padding: 15px; text-align: center; border-right: 1px solid #eee; }
+        .stat label { display: block; font-size: 0.6rem; color: #94a3b8; font-weight: 800; }
+        .stat b { font-size: 1.1rem; color: #004A87; }
+        .weeks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; padding: 25px; }
+        .week-card { background: white; border: 1px solid #eee; border-radius: 15px; padding: 15px; transition: 0.2s; }
+        .week-card:hover { border-color: #D4AF37; }
+        .zoom-btn { display: block; margin-top: 15px; background: #2D8CFF; color: white; text-align: center; padding: 10px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.75rem; }
+        .loading-state { height: 100vh; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #004a87; }
       `}</style>
 
       <header className="portal-header">
         <div className="header-inner">
-          <div className="logo-box" onClick={() => setSelectedId(null)} style={{cursor:'pointer'}}>
-            <h1>PORTAL DOCENTE</h1>
-            <p>Universidad del Magdalena • CREO</p>
+          <div onClick={() => setSelectedId(null)} style={{cursor:'pointer'}}>
+            <h1 style={{margin:0, fontSize:'1.4rem'}}>PORTAL DOCENTE</h1>
+            <p style={{margin:0, color:'#D4AF37', fontSize:'0.7rem', fontWeight:'bold'}}>CREO • Unimagdalena</p>
           </div>
-          <form onSubmit={handleSearch} className="search-container">
-            <input 
-              type="text" placeholder="Identificación..." 
-              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} 
-            />
+          <form onSubmit={handleSearch} className="search-box">
+            <input type="text" placeholder="Cédula..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             <button type="submit">BUSCAR</button>
           </form>
         </div>
@@ -150,72 +119,43 @@ const App = () => {
 
       <main className="portal-body">
         {!docente ? (
-          <div className="welcome-page">
-            <div style={{fontSize:'5rem', marginBottom:'20px'}}>👨‍🏫</div>
-            <h2>Bienvenido, Alberto</h2>
-            <p>Ingresa tu número de cédula para visualizar la programación académica completa.</p>
+          <div style={{gridColumn:'1/-1', textAlign:'center', padding:'100px'}}>
+            <h2 style={{color:'#004A87'}}>Bienvenido, Alberto</h2>
+            <p>Consulta tus horarios actualizados con la versión v1.8.</p>
           </div>
         ) : (
           <>
-            <aside className="sidebar-card">
-              <div className="teacher-profile">
-                <div className="initials">{docente.nombre.charAt(0)}</div>
-                <h3>{docente.nombre}</h3>
-                <span>ESPECIALISTA ASIGNADO</span>
-              </div>
-              <div className="nav-title">MIS ASIGNATURAS</div>
+            <aside className="sidebar">
+              <h3 style={{margin:'0 0 5px 0', color:'#004A87'}}>{docente.nombre}</h3>
+              <p style={{fontSize:'0.7rem', color:'#D4AF37', fontWeight:'bold', marginBottom:'20px'}}>DOCENTE ASIGNADO</p>
               {docente.cursos.map((c, i) => (
-                <button 
-                  key={i} onClick={() => setSelectedCursoIdx(i)} 
-                  className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}
-                >
-                  <b>{c.materia}</b>
-                  <i>Grupo {c.group}</i>
+                <button key={i} onClick={() => setSelectedCursoIdx(i)} className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}>
+                  <b style={{fontSize:'0.8rem', color:'#004A87'}}>{c.materia}</b>
                 </button>
               ))}
             </aside>
 
-            <section className="dashboard-main">
-              <div className="dash-header">
-                <h2>{cursoActivo.materia}</h2>
-                <div style={{marginTop:'10px', fontSize:'0.8rem', fontWeight:'bold', color:'#D4AF37'}}>SEGURIDAD Y SALUD EN EL TRABAJO</div>
+            <section className="main-dash">
+              <div className="dash-top">
+                <h2 style={{margin:0, fontSize:'1.3rem'}}>{cursoActivo.materia}</h2>
+                <span style={{fontSize:'0.75rem', color:'#D4AF37'}}>PROGRAMACIÓN SEMANAL</span>
               </div>
-
-              <div className="grid-stats">
-                <div className="stat-card"><label>Grupo</label><span>{cursoActivo.group}</span></div>
-                <div className="stat-card"><label>Cupos</label><span>{cursoActivo.cupos}</span></div>
-                <div className="stat-card"><label>Créditos</label><span>{cursoActivo.creditos}</span></div>
+              <div className="stats">
+                <div className="stat"><label>GRUPO</label><b>{cursoActivo.grupo}</b></div>
+                <div className="stat"><label>CUPOS</label><b>{cursoActivo.cupos}</b></div>
+                <div className="stat"><label>CRÉDITOS</label><b>{cursoActivo.creditos}</b></div>
               </div>
-
-              <div className="weeks-section">
-                <div className="section-header">
-                  <h3>Cronograma de Actividades</h3>
-                  <div className="line"></div>
-                </div>
-
-                <div className="weeks-container">
-                  {cursoActivo.semanas.map((s, idx) => (
-                    <div key={idx} className="week-item">
-                      <div className="week-num">SEMANA {idx + 1}</div>
-                      <div className="info-row">📅 <strong>{s.fecha}</strong></div>
-                      <div className="info-row">⏰ {s.hora}</div>
-                      {s.zoomId ? (
-                        <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-button">
-                          📹 ENTRAR A ZOOM (ID: {s.zoomId})
-                        </a>
-                      ) : (
-                        <div style={{marginTop:'20px', fontSize:'0.7rem', color:'#d1d5db', textAlign:'center', fontStyle:'italic'}}>
-                          Sala virtual no disponible
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="dash-footer">
-                <div>PERIODO ACADÉMICO: <b>{cursoActivo.fInicio}</b> - <b>{cursoActivo.fFin}</b></div>
-                <div style={{color:'#10b981'}}>✔ Datos Sincronizados</div>
+              <div className="weeks-grid">
+                {cursoActivo.semanas.map((s, idx) => (
+                  <div key={idx} className="week-card">
+                    <div style={{fontSize:'0.65rem', fontWeight:900, color:'#D4AF37', marginBottom:'10px'}}>SEMANA {idx + 1}</div>
+                    <div style={{fontSize:'0.8rem', fontWeight:'bold', marginBottom:'5px'}}>📅 {s.fecha}</div>
+                    <div style={{fontSize:'0.75rem', color:'#64748b'}}>⏰ {s.hora}</div>
+                    {s.zoomId && (
+                      <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-btn" title={s.detalleCompleto}>ENTRAR A ZOOM (ID: {s.zoomId})</a>
+                    )}
+                  </div>
+                ))}
               </div>
             </section>
           </>
