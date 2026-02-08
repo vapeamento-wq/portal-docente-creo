@@ -1,18 +1,35 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- CONFIGURACIÓN ---
+// --- 1. IMPORTAMOS LIBRERÍAS DE FIREBASE ---
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
+
+// --- 2. CONFIGURACIÓN DE TU PROYECTO (Tus Credenciales Reales) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCQDcFCVrpesMllsImPpppiK8MS3zcd0oE",
+  authDomain: "portal-creo.firebaseapp.com",
+  projectId: "portal-creo",
+  storageBucket: "portal-creo.firebasestorage.app",
+  messagingSenderId: "140879711888",
+  appId: "1:140879711888:web:8b1b24634ff49b33701215"
+};
+
+// Inicializamos la conexión con la Nube
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// --- 3. CONFIGURACIÓN GENERAL ---
 const URL_CSV = 
   import.meta.env?.VITE_SHEET_URL || 
-  process.env?.VITE_SHEET_URL || 
   process.env?.REACT_APP_SHEET_URL || 
-  ""; 
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
+
 const WHATSAPP_NUMBER = "573106964025";
-const ADMIN_PASS = "admincreo"; // Contraseña del Administrador
+const ADMIN_PASS = "admincreo"; 
 
 const App = () => {
-  // --- ESTADOS DE LA APP ---
-  const [view, setView] = useState('user'); // 'user' o 'admin'
-  const [adminAuth, setAdminAuth] = useState(false);
+  // --- ESTADOS ---
+  const [view, setView] = useState('user'); 
   const [passInput, setPassInput] = useState('');
   
   const [state, setState] = useState({ loading: true, teachers: {}, error: null });
@@ -20,33 +37,31 @@ const App = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
 
-  // Simulación de Logs (En el futuro esto vendrá de una base de datos real)
-  const [logs, setLogs] = useState([
-    { fecha: '08/02/2026 14:30', doc: '85467800', estado: '✅ Éxito', ip: '192.168.1.1' },
-    { fecha: '08/02/2026 14:35', doc: '12345678', estado: '❌ No encontrado', ip: '186.14.22.10' },
-    { fecha: '08/02/2026 15:00', doc: '1090444907', estado: '✅ Éxito', ip: '201.20.10.5' },
-  ]);
+  // Estados para el Historial Real (Firebase)
+  const [logs, setLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
+  // --- EFECTO 1: CARGAR HORARIOS DESDE EXCEL ---
   useEffect(() => {
-    if (!URL_CSV) {
-      setState(s => ({ ...s, loading: false, error: "Error: Variable de entorno no configurada." }));
-      return;
-    }
     fetch(URL_CSV)
       .then(res => res.text())
       .then(csvText => {
         const filas = csvText.split(/\r?\n/);
         const diccionario = {};
+        
         filas.forEach((fila) => {
           const c = fila.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
           if (c.length < 25) return;
+          
           const materia = c[3]?.replace(/"/g, '').trim();
           if (!materia || materia.toUpperCase().includes("PENDIENTE")) return;
+
           const nombre = c[0]?.replace(/"/g, '').trim();   
           const id = c[1]?.replace(/"/g, '').trim();       
           const grupo = c[5]?.replace(/"/g, '').trim();    
           const creditos = c[7]?.replace(/"/g, '').trim(); 
           const fInicio = c[12]?.replace(/"/g, '').trim(); 
+
           const semanas = [];
           for (let i = 14; i <= 29; i++) { 
             const texto = c[i]?.replace(/"/g, '').trim() || "";
@@ -54,6 +69,7 @@ const App = () => {
               const zoomId = texto.match(/\d{9,11}/)?.[0];
               const horaMatch = texto.match(/(\d{1,2}\s*A\s*\d{1,2})/i);
               const partes = texto.split('-');
+              
               semanas.push({
                 num: i - 13,
                 fecha: partes[0] ? partes[0].trim() : "Programada",
@@ -63,119 +79,149 @@ const App = () => {
               });
             }
           }
+
           if (id && !isNaN(id)) {
             const idLimpio = id.split('.')[0]; 
             if (!diccionario[idLimpio]) diccionario[idLimpio] = { nombre, idReal: idLimpio, cursos: [] };
-            if (semanas.length > 0) diccionario[idLimpio].cursos.push({ materia, grupo, creditos, fInicio, semanas });
+            if (semanas.length > 0) {
+              diccionario[idLimpio].cursos.push({ materia, grupo, creditos, fInicio, semanas });
+            }
           }
         });
         setState({ loading: false, teachers: diccionario, error: null });
       })
-      .catch(err => setState(s => ({ ...s, loading: false, error: "Error de conexión." })));
+      .catch(err => setState(s => ({ ...s, loading: false, error: "Error conectando con la base de datos académica." })));
   }, []);
 
-  const docente = useMemo(() => selectedId ? state.teachers[selectedId] : null, [selectedId, state.teachers]);
-  const cursoActivo = docente ? docente.cursos[selectedCursoIdx] : null;
+  // --- FUNCIÓN PARA LEER LOGS REALES (ADMIN) ---
+  const fetchLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      // Traemos las últimas 50 consultas ordenadas por fecha
+      const q = query(collection(db, "consultas"), orderBy("fechaIso", "desc"), limit(50));
+      const querySnapshot = await getDocs(q);
+      const historial = [];
+      querySnapshot.forEach((doc) => {
+        historial.push(doc.data());
+      });
+      setLogs(historial);
+    } catch (e) {
+      console.error("Error leyendo Firebase: ", e);
+      // Si falla, mostramos un log de ejemplo para no dejar vacío
+      setLogs([{ fecha: 'Sistema', doc: 'Error de lectura (Verificar permisos)', estado: '⚠️' }]);
+    }
+    setLoadingLogs(false);
+  };
 
-  const handleSearch = (e) => {
+  // Cargar logs al entrar al admin
+  useEffect(() => {
+    if (view === 'admin') {
+      fetchLogs();
+    }
+  }, [view]);
+
+  // --- MANEJO DE BÚSQUEDA (CON GUARDADO EN NUBE) ---
+  const handleSearch = async (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
+    const encontrado = !!state.teachers[idBusqueda];
     
-    // LOGICA DE REGISTRO (Aquí se guardaría en la base de datos real)
-    const nuevoLog = {
-      fecha: new Date().toLocaleString(),
-      doc: idBusqueda,
-      estado: state.teachers[idBusqueda] ? '✅ Éxito' : '❌ No encontrado',
-      ip: 'Usuario'
-    };
-    setLogs(prev => [nuevoLog, ...prev]);
+    // ☁️ GUARDAR EN FIREBASE
+    try {
+      await addDoc(collection(db, "consultas"), {
+        fecha: new Date().toLocaleString('es-CO'),
+        fechaIso: new Date().toISOString(),
+        doc: idBusqueda || "Vacío",
+        estado: encontrado ? '✅ Éxito' : '❌ Fallido',
+        plataforma: navigator.platform
+      });
+    } catch (e) {
+      console.error("No se pudo guardar el log: ", e);
+    }
 
-    if (state.teachers[idBusqueda]) {
+    if (encontrado) {
       setSelectedId(idBusqueda);
       setSelectedCursoIdx(0);
-    } else { alert("Identificación no encontrada."); }
+    } else { alert("Identificación no encontrada en el sistema."); }
   };
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passInput === ADMIN_PASS) {
-      setAdminAuth(true);
-      setView('admin');
-    } else {
-      alert("Acceso Denegado");
-    }
+    if (passInput === ADMIN_PASS) setView('admin');
+    else alert("Credenciales incorrectas");
   };
 
   const handleReset = () => { setSelectedId(null); setSearchTerm(''); setSelectedCursoIdx(0); };
 
-  // --- VISTA ADMINISTRADOR ---
-  if (view === 'admin' && adminAuth) {
+  // --- VISTA ADMIN (CONECTADA A NUBE) ---
+  if (view === 'admin') {
     return (
-      <div style={{fontFamily: 'Segoe UI, sans-serif', background: '#f4f6f8', minHeight: '100vh'}}>
-        <header style={{background: '#2c3e50', padding: '15px 20px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-          <div>
-            <h2 style={{margin:0}}>PANEL ADMINISTRATIVO</h2>
-            <small style={{color: '#f1c40f'}}>CONTROL DE ACCESO Y AUDITORÍA</small>
-          </div>
-          <button onClick={() => setView('user')} style={{background: 'white', color: '#2c3e50', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold'}}>⬅ Volver al Portal</button>
-        </header>
-
-        <main style={{maxWidth: '1000px', margin: '30px auto', padding: '0 20px'}}>
+      <div style={{fontFamily:'Segoe UI, sans-serif', background:'#f4f6f8', minHeight:'100vh', padding:'20px'}}>
+        <div style={{maxWidth:'1000px', margin:'0 auto'}}>
+          <header style={{background:'#2c3e50', color:'white', padding:'20px', borderRadius:'10px', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
+            <div>
+              <h2 style={{margin:0}}>PANEL DE CONTROL</h2>
+              <small style={{color:'#f1c40f'}}>AUDITORÍA EN LA NUBE (FIREBASE)</small>
+            </div>
+            <div style={{display:'flex', gap:'10px'}}>
+              <button onClick={fetchLogs} style={{background:'rgba(255,255,255,0.2)', color:'white', border:'none', padding:'8px 15px', borderRadius:'5px', cursor:'pointer'}}>↻ Refrescar</button>
+              <button onClick={()=>setView('user')} style={{background:'white', border:'none', padding:'8px 15px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold', color:'#2c3e50'}}>SALIR</button>
+            </div>
+          </header>
           
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '30px'}}>
-            <div style={{background: 'white', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', borderLeft: '5px solid #2ecc71'}}>
-              <h3 style={{margin: '0 0 10px 0', color: '#7f8c8d', fontSize: '0.8rem'}}>ESTADO DEL SISTEMA</h3>
-              <b style={{fontSize: '1.2rem', color: '#2ecc71'}}>EN LÍNEA ✅</b>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(250px, 1fr))', gap:'20px', marginBottom:'30px'}}>
+            <div style={{background:'white', padding:'20px', borderRadius:'10px', borderLeft:'5px solid #27ae60', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
+              <h4 style={{margin:'0 0 10px 0', color:'#7f8c8d'}}>ESTADO SERVIDOR</h4>
+              <b style={{color:'#27ae60', fontSize:'1.2rem'}}>CONECTADO 🟢</b>
             </div>
-            <div style={{background: 'white', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', borderLeft: '5px solid #3498db'}}>
-              <h3 style={{margin: '0 0 10px 0', color: '#7f8c8d', fontSize: '0.8rem'}}>TOTAL CONSULTAS (HOY)</h3>
-              <b style={{fontSize: '1.5rem', color: '#2c3e50'}}>{logs.length}</b>
-            </div>
-            <div style={{background: 'white', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', borderLeft: '5px solid #e74c3c'}}>
-              <h3 style={{margin: '0 0 10px 0', color: '#7f8c8d', fontSize: '0.8rem'}}>ERRORES DE BÚSQUEDA</h3>
-              <b style={{fontSize: '1.5rem', color: '#e74c3c'}}>{logs.filter(l => l.estado.includes('No')).length}</b>
+            <div style={{background:'white', padding:'20px', borderRadius:'10px', borderLeft:'5px solid #2980b9', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
+              <h4 style={{margin:'0 0 10px 0', color:'#7f8c8d'}}>REGISTROS EN PANTALLA</h4>
+              <b style={{color:'#2c3e50', fontSize:'1.5rem'}}>{logs.length}</b>
             </div>
           </div>
 
-          <div style={{background: 'white', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.05)'}}>
-            <div style={{padding: '20px', borderBottom: '1px solid #eee'}}>
-              <h3 style={{margin: 0, color: '#2c3e50'}}>📋 Registro de Actividad Reciente</h3>
-            </div>
-            <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem'}}>
-              <thead style={{background: '#f8f9fa'}}>
-                <tr>
-                  <th style={{padding: '15px', textAlign: 'left', color: '#7f8c8d'}}>FECHA / HORA</th>
-                  <th style={{padding: '15px', textAlign: 'left', color: '#7f8c8d'}}>DOCUMENTO BUSCADO</th>
-                  <th style={{padding: '15px', textAlign: 'left', color: '#7f8c8d'}}>RESULTADO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log, i) => (
-                  <tr key={i} style={{borderBottom: '1px solid #eee'}}>
-                    <td style={{padding: '15px'}}>{log.fecha}</td>
-                    <td style={{padding: '15px'}}><b>{log.doc}</b></td>
-                    <td style={{padding: '15px'}}>
-                      <span style={{
-                        background: log.estado.includes('Éxito') ? '#e8f8f5' : '#fdedec',
-                        color: log.estado.includes('Éxito') ? '#27ae60' : '#c0392b',
-                        padding: '5px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold'
-                      }}>
-                        {log.estado}
-                      </span>
-                    </td>
+          <div style={{background:'white', borderRadius:'10px', padding:'20px', boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
+            <h3 style={{marginTop:0, borderBottom:'1px solid #eee', paddingBottom:'15px'}}>Últimas Consultas Realizadas</h3>
+            {loadingLogs ? <p style={{textAlign:'center', color:'#888'}}>Cargando datos desde Google Cloud...</p> : (
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem'}}>
+                <thead>
+                  <tr style={{background:'#f8f9fa', textAlign:'left'}}>
+                    <th style={{padding:'10px'}}>Fecha y Hora</th>
+                    <th style={{padding:'10px'}}>Documento</th>
+                    <th style={{padding:'10px'}}>Resultado</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {logs.map((l, i) => (
+                    <tr key={i} style={{borderBottom:'1px solid #eee'}}>
+                      <td style={{padding:'10px'}}>{l.fecha}</td>
+                      <td style={{padding:'10px'}}><b>{l.doc}</b></td>
+                      <td style={{padding:'10px'}}>
+                        <span style={{
+                          color: l.estado.includes('Éxito')?'#27ae60':'#c0392b', 
+                          background: l.estado.includes('Éxito')?'#eafaf1':'#fdedec',
+                          padding:'4px 8px', borderRadius:'4px', fontWeight:'bold', fontSize:'0.8rem'
+                        }}>
+                          {l.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {logs.length === 0 && (
+                    <tr><td colSpan="3" style={{padding:'20px', textAlign:'center', color:'#888'}}>No hay registros aún. Realiza una búsqueda para probar.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
-        </main>
+        </div>
       </div>
     );
   }
 
-  // --- VISTA USUARIO (PORTAL NORMAL) ---
-  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando Portal...</p></div>;
-  if (state.error) return <div className="error-screen"><h3>⚠️ Error</h3><p>{state.error}</p></div>;
+  // --- VISTA USUARIO (PORTAL) ---
+  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Iniciando Sistema...</p></div>;
+  if (state.error) return <div className="error-screen"><h3>⚠️ Error Crítico</h3><p>{state.error}</p></div>;
 
   return (
     <div className="portal-container">
@@ -189,38 +235,27 @@ const App = () => {
         .actions { display: flex; gap: 10px; }
         .search-form { display: flex; background: rgba(255,255,255,0.15); padding: 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); }
         .search-form input { background: transparent; border: none; padding: 8px; outline: none; color: white; width: 160px; font-weight: 500; }
-        .search-form input::placeholder { color: rgba(255,255,255,0.7); }
-        .btn-search { background: var(--secondary); color: var(--primary); border: none; padding: 8px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-search:hover { background: white; }
-        .btn-reset { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-search { background: var(--secondary); color: var(--primary); border: none; padding: 8px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-reset { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .main-content { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 30px; }
         .welcome-box { grid-column: 1/-1; text-align: center; padding: 60px 20px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 5px solid var(--orange); }
         .welcome-title { color: var(--primary); font-size: 1.8rem; margin-bottom: 20px; font-weight: 700; }
-        .welcome-text { font-size: 1.1rem; color: #555; line-height: 1.6; max-width: 800px; margin: 0 auto; }
-        .welcome-note { margin-top: 25px; font-size: 0.95rem; color: #888; font-style: italic; background: #f8fafc; display: inline-block; padding: 10px 20px; border-radius: 50px; }
         .sidebar { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .prof-info h3 { margin: 0; color: var(--primary); font-size: 1.2rem; }
-        .prof-info span { font-size: 0.8rem; color: #666; display: block; margin-top: 5px; }
         .nav-title { font-size: 0.7rem; color: var(--secondary); font-weight: 800; text-transform: uppercase; margin: 20px 0 10px; display: block; }
         .courses-nav { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
-        .course-btn { min-width: 220px; text-align: left; background: #fff; border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; position: relative; }
+        .course-btn { min-width: 220px; text-align: left; background: #fff; border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; cursor: pointer; position: relative; }
         .course-btn.active { background: #fdfcf5; border-color: var(--secondary); border-left: 5px solid var(--secondary); }
-        .course-btn b { display: block; color: var(--primary); font-size: 0.9rem; margin-bottom: 5px; }
         .dashboard { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); flex: 1; }
         .dash-head { background: var(--primary); color: white; padding: 25px 30px; }
-        .dash-head h3 { margin: 0; font-size: 1.3rem; font-weight: 600; text-transform: uppercase; }
         .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); background: #f9f9f9; border-bottom: 1px solid #eee; }
         .stat { padding: 20px; text-align: center; border-right: 1px solid #eee; }
-        .stat label { display: block; font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
         .stat span { font-size: 1.1rem; color: var(--primary); font-weight: 700; }
         .weeks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; padding: 30px; }
         .week-card { border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; background: #fff; transition: 0.3s; }
-        .week-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-color: var(--secondary); }
+        .week-card:hover { transform: translateY(-3px); border-color: var(--secondary); }
         .week-tag { font-size: 0.7rem; font-weight: 800; color: var(--secondary); text-transform: uppercase; margin-bottom: 10px; display: block; }
-        .date { font-size: 0.95rem; font-weight: 600; color: #333; margin-bottom: 5px; }
-        .time { font-size: 0.85rem; color: #666; margin-bottom: 15px; display: flex; align-items: center; gap: 5px; }
         .zoom-area { background: #f0f4f8; padding: 15px; border-radius: 8px; text-align: center; border: 1px dashed #cbd5e1; }
-        .zoom-id { display: block; font-size: 0.8rem; color: var(--primary); font-weight: 700; margin-bottom: 8px; }
         .zoom-link { display: block; background: #2D8CFF; color: white; padding: 10px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 0.85rem; }
         .whatsapp-btn { position: fixed; bottom: 25px; right: 25px; background: #25D366; color: white; padding: 12px 24px; border-radius: 50px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4); z-index: 9999; display: flex; align-items: center; gap: 10px; }
         .loading-screen, .error-screen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--primary); font-weight: bold; }
@@ -233,15 +268,14 @@ const App = () => {
         }
       `}</style>
 
-      {/* LOGIN MODAL PARA ADMIN (SOLO VISIBLE SI view ES 'login') */}
       {view === 'login' && (
-        <div style={{position: 'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}}>
-          <form onSubmit={handleLogin} style={{background:'white', padding:'30px', borderRadius:'10px', textAlign:'center', width:'300px'}}>
-            <h3 style={{color: 'var(--primary)', marginTop:0}}>Acceso Administrativo</h3>
-            <input type="password" placeholder="Contraseña..." value={passInput} onChange={(e)=>setPassInput(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ccc', borderRadius:'5px'}} autoFocus />
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <form onSubmit={handleLogin} style={{background:'white', padding:'30px', borderRadius:'10px', width:'300px', textAlign:'center'}}>
+            <h3 style={{color:'var(--primary)', marginTop:0}}>Acceso Admin</h3>
+            <input type="password" placeholder="Contraseña..." value={passInput} onChange={(e)=>setPassInput(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ddd', borderRadius:'5px'}} autoFocus />
             <div style={{display:'flex', gap:'10px'}}>
-              <button type="button" onClick={()=>setView('user')} style={{flex:1, padding:'10px', background:'#ccc', border:'none', borderRadius:'5px', cursor:'pointer'}}>Cancelar</button>
-              <button type="submit" style={{flex:1, padding:'10px', background:'var(--primary)', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontWeight:'bold'}}>Entrar</button>
+              <button type="button" onClick={()=>setView('user')} style={{flex:1, padding:'10px', cursor:'pointer'}}>Cancelar</button>
+              <button type="submit" style={{flex:1, background:'var(--primary)', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontWeight:'bold'}}>Entrar</button>
             </div>
           </form>
         </div>
@@ -254,14 +288,10 @@ const App = () => {
             <h2>ADMINISTRACIÓN DE LA SEGURIDAD Y SALUD EN EL TRABAJO</h2>
           </div>
           <div className="actions">
-            {docente && (
-              <button onClick={handleReset} className="btn-reset">
-                Nueva Consulta ↺
-              </button>
-            )}
+            {docente && <button onClick={handleReset} className="btn-reset">Nueva Consulta ↺</button>}
             {!docente && (
               <form onSubmit={handleSearch} className="search-form">
-                <input type="text" placeholder="Documento..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder="Documento..." value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
                 <button type="submit" className="btn-search">BUSCAR</button>
               </form>
             )}
@@ -273,17 +303,9 @@ const App = () => {
         {!docente ? (
           <div className="welcome-box">
             <h2 className="welcome-title">Bienvenido a la consulta de sus asignaciones y horarios docente de programa</h2>
-            <p className="welcome-text">
-              Ingrese su número de documento en la parte superior para acceder a su programación académica, enlaces de conexión y detalles de grupos asignados.
-            </p>
-            <div className="welcome-note">
-              Si tienes algún error en su asignación porfavor escribir a mesa de ayuda.
-            </div>
-            
-            {/* BOTÓN CANDADO PARA ENTRAR A ADMIN */}
-            <div style={{marginTop: '40px', opacity: 0.3, cursor: 'pointer'}} onClick={() => setView('login')} title="Acceso Administrativo">
-              🔒
-            </div>
+            <p className="welcome-text">Ingrese su número de documento en la parte superior para acceder a su programación académica, enlaces de conexión y detalles de grupos asignados.</p>
+            <div className="welcome-note">Si tienes algún error en su asignación porfavor escribir a mesa de ayuda.</div>
+            <div style={{marginTop:'40px', opacity:0.3, cursor:'pointer'}} onClick={()=>setView('login')} title="Admin">🔒</div>
           </div>
         ) : (
           <>
@@ -295,40 +317,33 @@ const App = () => {
               <span className="nav-title">ASIGNATURAS</span>
               <div className="courses-nav">
                 {docente.cursos.map((c, i) => (
-                  <button key={i} onClick={() => setSelectedCursoIdx(i)} className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}>
+                  <button key={i} onClick={()=>setSelectedCursoIdx(i)} className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}>
                     <b>{c.materia}</b>
                     <span>Grupo {c.grupo}</span>
                   </button>
                 ))}
               </div>
             </aside>
-
             <section className="dashboard">
-              <div className="dash-head">
-                <h3>{cursoActivo.materia}</h3>
-              </div>
+              <div className="dash-head"><h3>{cursoActivo.materia}</h3></div>
               <div className="stats-bar">
                 <div className="stat"><label>Grupo</label><span>{cursoActivo.grupo}</span></div>
                 <div className="stat"><label>Créditos</label><span>{cursoActivo.creditos}</span></div>
                 <div className="stat"><label>Inicio</label><span>{cursoActivo.fInicio}</span></div>
               </div>
-              
               <div className="weeks-grid">
                 {cursoActivo.semanas.map((s, idx) => (
                   <div key={idx} className="week-card">
                     <span className="week-tag">SEMANA {s.num}</span>
                     <div className="date">📅 {s.fecha}</div>
                     <div className="time">⏰ {s.hora}</div>
-                    
                     {s.zoomId ? (
                       <div className="zoom-area">
                         <span className="zoom-id">ID: {s.zoomId}</span>
                         <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-link">ENTRAR A CLASE</a>
                       </div>
                     ) : (
-                      <div style={{marginTop:'15px', fontStyle:'italic', color:'#aaa', fontSize:'0.8rem', textAlign:'center'}}>
-                        Sin sala asignada
-                      </div>
+                      <div style={{marginTop:'15px', fontStyle:'italic', color:'#aaa', fontSize:'0.8rem', textAlign:'center'}}>Sin sala asignada</div>
                     )}
                   </div>
                 ))}
