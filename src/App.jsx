@@ -15,10 +15,17 @@ const firebaseConfig = {
 };
 
 // Inicializamos la conexión con la Nube
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Usamos try/catch para que si falla la nube, la app siga funcionando
+let app, db;
+try {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+} catch (e) {
+  console.error("Error inicializando Firebase:", e);
+}
 
 // --- 3. CONFIGURACIÓN GENERAL ---
+// Url con respaldo por si falla la variable de entorno
 const URL_CSV = 
   import.meta.env?.VITE_SHEET_URL || 
   process.env?.REACT_APP_SHEET_URL || 
@@ -95,6 +102,7 @@ const App = () => {
 
   // --- FUNCIÓN PARA LEER LOGS REALES (ADMIN) ---
   const fetchLogs = async () => {
+    if (!db) return; // Si no hay base de datos, no hacemos nada
     setLoadingLogs(true);
     try {
       // Traemos las últimas 50 consultas ordenadas por fecha
@@ -107,8 +115,8 @@ const App = () => {
       setLogs(historial);
     } catch (e) {
       console.error("Error leyendo Firebase: ", e);
-      // Si falla, mostramos un log de ejemplo para no dejar vacío
-      setLogs([{ fecha: 'Sistema', doc: 'Error de lectura (Verificar permisos)', estado: '⚠️' }]);
+      // Mensaje amigable si falla la lectura (ej: permisos o modo prueba expirado)
+      setLogs([{ fecha: 'Sistema', doc: 'No se pudo leer el historial (Verificar Firebase)', estado: '⚠️' }]);
     }
     setLoadingLogs(false);
   };
@@ -126,17 +134,19 @@ const App = () => {
     const idBusqueda = searchTerm.replace(/\D/g, '');
     const encontrado = !!state.teachers[idBusqueda];
     
-    // ☁️ GUARDAR EN FIREBASE
-    try {
-      await addDoc(collection(db, "consultas"), {
-        fecha: new Date().toLocaleString('es-CO'),
-        fechaIso: new Date().toISOString(),
-        doc: idBusqueda || "Vacío",
-        estado: encontrado ? '✅ Éxito' : '❌ Fallido',
-        plataforma: navigator.platform
-      });
-    } catch (e) {
-      console.error("No se pudo guardar el log: ", e);
+    // ☁️ GUARDAR EN FIREBASE (INTENTO SEGURO)
+    if (db && idBusqueda) {
+        try {
+        await addDoc(collection(db, "consultas"), {
+            fecha: new Date().toLocaleString('es-CO'),
+            fechaIso: new Date().toISOString(),
+            doc: idBusqueda,
+            estado: encontrado ? '✅ Éxito' : '❌ Fallido',
+            plataforma: navigator.platform || 'Web'
+        });
+        } catch (e) {
+        console.error("No se pudo guardar el log en la nube (pero la app sigue): ", e);
+        }
     }
 
     if (encontrado) {
@@ -181,7 +191,7 @@ const App = () => {
           </div>
 
           <div style={{background:'white', borderRadius:'10px', padding:'20px', boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
-            <h3 style={{marginTop:0, borderBottom:'1px solid #eee', paddingBottom:'15px'}}>Últimas Consultas Realizadas</h3>
+            <h3 style={{marginTop:0, borderBottom:'1px solid #eee', paddingBottom:'15px'}}>Historial de Accesos</h3>
             {loadingLogs ? <p style={{textAlign:'center', color:'#888'}}>Cargando datos desde Google Cloud...</p> : (
               <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem'}}>
                 <thead>
@@ -240,14 +250,18 @@ const App = () => {
         .main-content { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 30px; }
         .welcome-box { grid-column: 1/-1; text-align: center; padding: 60px 20px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 5px solid var(--orange); }
         .welcome-title { color: var(--primary); font-size: 1.8rem; margin-bottom: 20px; font-weight: 700; }
+        .welcome-text { font-size: 1.1rem; color: #555; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+        .welcome-note { margin-top: 25px; font-size: 0.95rem; color: #888; font-style: italic; background: #f8fafc; display: inline-block; padding: 10px 20px; border-radius: 50px; }
         .sidebar { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .prof-info h3 { margin: 0; color: var(--primary); font-size: 1.2rem; }
+        .prof-info span { font-size: 0.8rem; color: #666; display: block; margin-top: 5px; }
         .nav-title { font-size: 0.7rem; color: var(--secondary); font-weight: 800; text-transform: uppercase; margin: 20px 0 10px; display: block; }
         .courses-nav { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
         .course-btn { min-width: 220px; text-align: left; background: #fff; border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; cursor: pointer; position: relative; }
         .course-btn.active { background: #fdfcf5; border-color: var(--secondary); border-left: 5px solid var(--secondary); }
         .dashboard { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); flex: 1; }
         .dash-head { background: var(--primary); color: white; padding: 25px 30px; }
+        .dash-head h3 { margin: 0; font-size: 1.3rem; font-weight: 600; text-transform: uppercase; }
         .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); background: #f9f9f9; border-bottom: 1px solid #eee; }
         .stat { padding: 20px; text-align: center; border-right: 1px solid #eee; }
         .stat span { font-size: 1.1rem; color: var(--primary); font-weight: 700; }
@@ -255,6 +269,8 @@ const App = () => {
         .week-card { border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; background: #fff; transition: 0.3s; }
         .week-card:hover { transform: translateY(-3px); border-color: var(--secondary); }
         .week-tag { font-size: 0.7rem; font-weight: 800; color: var(--secondary); text-transform: uppercase; margin-bottom: 10px; display: block; }
+        .date { font-size: 0.95rem; font-weight: 600; color: #333; margin-bottom: 5px; }
+        .time { font-size: 0.85rem; color: #666; margin-bottom: 15px; display: flex; align-items: center; gap: 5px; }
         .zoom-area { background: #f0f4f8; padding: 15px; border-radius: 8px; text-align: center; border: 1px dashed #cbd5e1; }
         .zoom-link { display: block; background: #2D8CFF; color: white; padding: 10px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 0.85rem; }
         .whatsapp-btn { position: fixed; bottom: 25px; right: 25px; background: #25D366; color: white; padding: 12px 24px; border-radius: 50px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4); z-index: 9999; display: flex; align-items: center; gap: 10px; }
