@@ -3,8 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
 
 const App = () => {
-  const [datosDocentes, setDatosDocentes] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState({ loading: true, error: null, teachers: {} });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
@@ -26,23 +25,19 @@ const App = () => {
           const grupo = c[11]?.replace(/"/g, '').trim();  // Columna L: Grupo
 
           const semanas = [];
-          for (let i = 55; i <= 62; i++) { // Columnas BD a BK (Semanas 1-8)
-            if (c[i]) {
-              const texto = c[i].replace(/"/g, '').trim();
-              
-              // 2. Lógica de Zoom: Extraer el ID exacto (ej: ID - 6096090003)
-              const matchId = texto.match(/ID\s*-\s*(\d+)/i) || texto.match(/ID\s*(\d+)/i);
-              const zoomId = matchId ? matchId[1] : null;
-              
-              // 3. Extraer Fecha y Hora del formato "martes / 24 / febrero-18 A 20"
-              const partes = texto.split('-');
-              semanas.push({
-                fecha: partes[0] || "No asignada",
-                hora: partes[1] || "No asignada",
-                zoomLink: zoomId ? `https://zoom.us/j/${zoomId}` : null,
-                zoomId: zoomId
-              });
-            }
+          for (let i = 55; i <= 62; i++) { // Columnas BD a BK
+            const texto = c[i]?.replace(/"/g, '').trim() || "-";
+            const matchId = texto.match(/ID\s*-\s*(\d+)/i) || texto.match(/ID\s*(\d+)/i);
+            const zoomId = matchId ? matchId[1] : null;
+            const partes = texto.split('-');
+            
+            semanas.push({
+              fecha: partes[0] || "Pendiente",
+              hora: partes[1] || "Pendiente",
+              zoomLink: zoomId ? `https://zoom.us/j/${zoomId}` : null,
+              zoomId: zoomId,
+              original: texto
+            });
           }
 
           if (id && !isNaN(id)) {
@@ -50,141 +45,174 @@ const App = () => {
             diccionario[id].cursos.push({ materia, grupo, semanas });
           }
         });
-        setDatosDocentes(diccionario);
-        setLoading(false);
-      });
+        setState({ loading: false, error: null, teachers: diccionario });
+      })
+      .catch(() => setState({ loading: false, error: "Error de conexión", teachers: {} }));
   }, []);
 
-  const docente = useMemo(() => selectedId ? datosDocentes[selectedId] : null, [selectedId, datosDocentes]);
+  const docente = useMemo(() => selectedId ? state.teachers[selectedId] : null, [selectedId, state.teachers]);
   const cursoActivo = docente ? docente.cursos[selectedCursoIdx] : null;
 
   const handleSearch = (e) => {
     e.preventDefault();
     const idLimpio = searchTerm.replace(/\D/g, '');
-    if (datosDocentes[idLimpio]) {
+    if (state.teachers[idLimpio]) {
       setSelectedId(idLimpio);
       setSelectedCursoIdx(0);
     } else {
-      alert("Cédula no encontrada en la base de datos.");
+      alert("Identificación no encontrada.");
     }
   };
 
-  if (loading) return <div className="loader">Cargando Portal CREO...</div>;
+  if (state.loading) return (
+    <div className="loading-screen">
+      <div className="spinner"></div>
+      <p>Sincronizando Horarios CREO...</p>
+    </div>
+  );
 
   return (
-    <div className="app-container">
-      {/* 1. Header Centrado */}
-      <header className="main-header">
-        <h1>PORTAL DOCENTE CREO</h1>
-        <p>UNIVERSIDAD DEL MAGDALENA</p>
+    <div className="app-shell">
+      {/* HEADER PROFESIONAL */}
+      <header className="header">
+        <div className="header-content">
+          <div className="brand" onClick={() => setSelectedId(null)}>
+            <h1>PORTAL DOCENTE CREO</h1>
+            <p>ADMINISTRACIÓN DE LA SEGURIDAD Y SALUD EN EL TRABAJO</p>
+          </div>
+          <form onSubmit={handleSearch} className="search-box">
+            <input 
+              type="text" placeholder="Cédula del docente..." 
+              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <button type="submit">CONSULTAR</button>
+          </form>
+        </div>
       </header>
 
-      <div className="content-wrapper">
-        {/* Buscador */}
-        <form onSubmit={handleSearch} className="search-form">
-          <input 
-            type="text" placeholder="Ingrese su cédula..." value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button type="submit">BUSCAR</button>
-        </form>
-
-        {docente && (
-          <div className="main-layout">
-            {/* 3. Panel Lateral de Cursos */}
-            <aside className="sidebar">
-              <div className="teacher-info">
-                <h3>{docente.nombre}</h3>
-                <p>Docente</p>
+      <main className="main-layout">
+        {!docente ? (
+          <div className="empty-state animate-fade">
+            <div className="icon-circle">📅</div>
+            <h2>Portal de Horarios Académicos</h2>
+            <p>Ingrese su identificación para acceder a la planeación de clases y salas Zoom.</p>
+          </div>
+        ) : (
+          <div className="dashboard">
+            {/* SIDEBAR DE CURSOS */}
+            <aside className="sidebar animate-slide">
+              <div className="user-card">
+                <div className="avatar">{docente.nombre.charAt(0)}</div>
+                <div>
+                  <h3>{docente.nombre}</h3>
+                  <span>DOCENTE ACTIVO</span>
+                </div>
               </div>
-              <h4 className="sidebar-title">MIS ASIGNATURAS</h4>
-              {docente.cursos.map((c, i) => (
-                <button 
-                  key={i} 
-                  onClick={() => setSelectedCursoIdx(i)} 
-                  className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}
-                >
-                  <span className="course-name">{c.materia}</span>
-                  <span className="course-group">Grupo: {c.grupo}</span>
-                </button>
-              ))}
+              <nav className="course-list">
+                {docente.cursos.map((c, i) => (
+                  <button key={i} onClick={() => setSelectedCursoIdx(i)} className={selectedCursoIdx === i ? 'active' : ''}>
+                    <strong>{c.materia}</strong>
+                    <span>Grupo: {c.grupo}</span>
+                  </button>
+                ))}
+              </nav>
             </aside>
 
-            {/* 3. Contenido Principal con Semanas */}
-            <main className="main-content">
-              <div className="course-header">
+            {/* CONTENIDO DE SEMANAS */}
+            <section className="content animate-fade">
+              <div className="course-info">
                 <h2>{cursoActivo.materia}</h2>
-                <span className="badge">GRUPO {cursoActivo.grupo}</span>
+                <div className="info-badges">
+                  <span className="badge-blue">GRUPO {cursoActivo.grupo}</span>
+                  <span className="badge-gold">PROGRAMACIÓN SEMANAL</span>
+                </div>
               </div>
-              
+
               <div className="weeks-grid">
                 {cursoActivo.semanas.map((s, idx) => (
                   <div key={idx} className="week-card">
-                    <div className="week-number">SEMANA {idx + 1}</div>
-                    <div className="week-detail">📅 {s.fecha}</div>
-                    <div className="week-detail">⏰ {s.hora}</div>
-                    {s.zoomId ? (
-                      <div className="zoom-section">
-                        <span className="zoom-id">ID: {s.zoomId}</span>
-                        <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-btn">
-                          ENTRAR A ZOOM
-                        </a>
-                      </div>
-                    ) : (
-                      <div className="no-zoom">Sala no asignada</div>
-                    )}
+                    <div className="week-tag">SEMANA {idx + 1}</div>
+                    <div className="week-body">
+                      <p>📅 {s.fecha}</p>
+                      <p>⏰ {s.hora}</p>
+                      {s.zoomId ? (
+                        <div className="zoom-area">
+                          <small>ID: {s.zoomId}</small>
+                          <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-btn">UNIRSE A CLASE</a>
+                        </div>
+                      ) : <div className="no-zoom">Sin sala virtual</div>}
+                    </div>
                   </div>
                 ))}
               </div>
-            </main>
+            </section>
           </div>
         )}
-      </div>
+      </main>
+
+      <footer className="footer">
+        <p>© 2026 <strong>PORTAL DOCENTE CREO</strong> — Universidad del Magdalena</p>
+      </footer contractors>
 
       <style>{`
-        .app-container { background-color: #f0f2f5; min-height: 100vh; font-family: 'Segoe UI', sans-serif; }
-        .main-header { background-color: #004A87; color: white; padding: 20px; text-align: center; border-bottom: 4px solid #D4AF37; }
-        .main-header h1 { margin: 0; font-size: 1.6rem; letter-spacing: 1px; }
-        .main-header p { color: #D4AF37; margin: 5px 0 0; font-weight: bold; font-size: 0.8rem; }
+        :root { --azul: #004A87; --dorado: #D4AF37; --bg: #f8fafc; }
+        .app-shell { background: var(--bg); min-height: 100vh; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; }
         
-        .content-wrapper { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .search-form { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; }
-        .search-form input { padding: 12px; borderRadius: 8px; border: 1px solid #ccc; width: 100%; max-width: 300px; outline: none; }
-        .search-form button { background-color: #004A87; color: white; border: none; padding: 10px 25px; borderRadius: 8px; cursor: pointer; font-weight: bold; }
+        .header { background: white; border-bottom: 3px solid var(--azul); padding: 15px 20px; sticky: top; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .brand h1 { color: var(--azul); margin: 0; font-size: 1.4rem; font-weight: 900; cursor: pointer; }
+        .brand p { color: var(--dorado); margin: 0; font-size: 0.65rem; font-weight: 800; letter-spacing: 1px; }
         
-        .main-layout { display: flex; gap: 20px; flex-wrap: wrap; }
-        .sidebar { flex: 0 0 300px; background: white; padding: 20px; borderRadius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .teacher-info { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
-        .teacher-info h3 { margin: 0; color: #004A87; font-size: 1.1rem; }
-        .teacher-info p { margin: 0; color: #999; font-size: 0.8rem; font-weight: bold; }
-        .sidebar-title { font-size: 0.75rem; color: #D4AF37; margin-bottom: 15px; letter-spacing: 1px; }
+        .search-box { display: flex; background: #f1f5f9; border-radius: 10px; padding: 5px; border: 1px solid #e2e8f0; }
+        .search-box input { border: none; background: none; padding: 10px; outline: none; width: 200px; font-weight: 600; }
+        .search-box button { background: var(--azul); color: white; border: none; padding: 8px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+        .main-layout { max-width: 1200px; margin: 0 auto; width: 100%; flex: 1; padding: 30px 20px; }
+        .empty-state { text-align: center; padding: 100px 0; color: #64748b; }
+        .icon-circle { font-size: 50px; margin-bottom: 20px; opacity: 0.5; }
+
+        .dashboard { display: grid; grid-template-columns: 300px 1fr; gap: 30px; }
+        .sidebar { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); height: fit-content; }
+        .user-card { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; }
+        .avatar { width: 50px; height: 50px; background: var(--azul); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; }
+        .user-card h3 { margin: 0; font-size: 1rem; color: var(--azul); }
+        .user-card span { font-size: 0.6rem; font-weight: bold; color: var(--dorado); }
+
+        .course-list button { width: 100%; text-align: left; padding: 15px; margin-bottom: 10px; border-radius: 12px; border: 1px solid #f1f5f9; background: #f8fafc; cursor: pointer; transition: 0.2s; }
+        .course-list button.active { border-color: var(--dorado); background: #fffdf5; box-shadow: 0 4px 10px rgba(212, 175, 55, 0.1); }
+        .course-list button strong { display: block; color: var(--azul); font-size: 0.85rem; }
+        .course-list button span { font-size: 0.7rem; color: #94a3b8; }
+
+        .content { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .course-info h2 { margin: 0 0 15px 0; color: var(--azul); font-size: 1.5rem; }
+        .info-badges { display: flex; gap: 10px; margin-bottom: 30px; }
+        .badge-blue { background: #e0f2fe; color: var(--azul); padding: 5px 15px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; }
+        .badge-gold { background: #fef3c7; color: #92400e; padding: 5px 15px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; }
+
+        .weeks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .week-card { background: #f8fafc; border-radius: 15px; border: 1px solid #e2e8f0; overflow: hidden; }
+        .week-tag { background: white; padding: 10px; font-size: 0.7rem; font-weight: 800; color: var(--dorado); border-bottom: 1px solid #e2e8f0; text-align: center; }
+        .week-body { padding: 15px; font-size: 0.8rem; }
+        .week-body p { margin: 5px 0; color: #334155; font-weight: 500; }
         
-        .course-btn { width: 100%; text-align: left; padding: 15px; margin-bottom: 10px; borderRadius: 10px; cursor: pointer; border: 1px solid #eee; background: white; transition: 0.3s; }
-        .course-btn.active { border: 2px solid #D4AF37; background: #fffdf0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .course-name { display: block; font-size: 0.85rem; color: #004A87; font-weight: bold; margin-bottom: 4px; }
-        .course-group { font-size: 0.7rem; color: #999; }
+        .zoom-area { margin-top: 15px; padding-top: 10px; border-top: 1px dashed #cbd5e1; }
+        .zoom-area small { display: block; font-size: 0.65rem; color: #94a3b8; margin-bottom: 5px; }
+        .zoom-btn { display: block; background: #2D8CFF; color: white; text-align: center; padding: 8px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.7rem; }
+        .no-zoom { font-size: 0.65rem; color: #cbd5e1; text-align: center; margin-top: 15px; }
 
-        .main-content { flex: 1; background: white; padding: 25px; borderRadius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); min-width: 300px; }
-        .course-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid #f0f2f5; padding-bottom: 15px; }
-        .course-header h2 { margin: 0; color: #004A87; font-size: 1.3rem; }
-        .badge { background: #004A87; color: white; padding: 4px 12px; borderRadius: 20px; font-size: 0.7rem; font-weight: bold; }
+        .footer { text-align: center; padding: 40px; color: #94a3b8; font-size: 0.75rem; }
+        .loading-screen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--azul); font-weight: bold; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: var(--azul); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
 
-        .weeks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
-        .week-card { border: 1px solid #f0f0f0; padding: 15px; borderRadius: 12px; background: #fafafa; }
-        .week-number { color: #D4AF37; font-weight: bold; font-size: 0.75rem; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .week-detail { font-size: 0.8rem; margin-bottom: 6px; color: #444; }
-        
-        .zoom-section { margin-top: 12px; border-top: 1px dashed #ccc; paddingTop: 12px; }
-        .zoom-id { display: block; font-size: 0.7rem; color: #888; margin-bottom: 8px; font-family: monospace; }
-        .zoom-btn { display: block; text-align: center; background: #2D8CFF; color: white; padding: 8px; borderRadius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: bold; transition: 0.3s; }
-        .zoom-btn:hover { background: #1a73e8; }
-        .no-zoom { font-size: 0.7rem; color: #ccc; margin-top: 15px; text-align: center; font-style: italic; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-fade { animation: fadeIn 0.5s ease-out; }
+        .animate-slide { animation: slideIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
 
-        .loader { text-align: center; padding: 50px; color: #004A87; font-weight: bold; }
-
-        @media (max-width: 768px) {
-          .main-layout { flex-direction: column; }
-          .sidebar { flex: none; width: 100%; box-sizing: border-box; }
+        @media (max-width: 900px) {
+          .dashboard { grid-template-columns: 1fr; }
+          .header-content { justify-content: center; text-align: center; }
         }
       `}</style>
     </div>
