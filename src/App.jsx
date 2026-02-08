@@ -26,7 +26,7 @@ const App = () => {
           const materia = c[9]?.replace(/"/g, '').trim(); // Columna J: Materia
           const grupo = c[11]?.replace(/"/g, '').trim();  // Columna L: Grupo
 
-          // Extraer las 8 semanas (Columnas 55 a 62 / BD a BK)
+          // Extraer las 8 semanas (Columnas 55 a 62)
           const semanas = [];
           for (let i = 55; i <= 62; i++) {
             if (c[i]) {
