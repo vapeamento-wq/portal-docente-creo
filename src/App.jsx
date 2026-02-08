@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
+// PRÓXIMO PASO: Cambiaremos esta URL por una Variable de Entorno para mayor seguridad
 const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
 
 const App = () => {
@@ -69,118 +70,106 @@ const App = () => {
     } else { alert("Cédula no encontrada."); }
   };
 
-  if (state.loading) return <div className="loading-state">Optimizando para Móvil...</div>;
+  if (state.loading) return <div className="loading-screen">Configurando v2.7...</div>;
 
   return (
-    <div className="portal-mobile-ready">
+    <div className="portal-app">
       <style>{`
         #root { width: 100% !important; max-width: 100% !important; margin: 0 !important; }
-        .portal-mobile-ready { background: #f0f4f8; min-height: 100vh; font-family: 'Inter', system-ui, sans-serif; }
+        .portal-app { background: #f1f5f9; min-height: 100vh; font-family: 'Segoe UI', sans-serif; position: relative; }
         
-        .main-header { background: #004A87; color: white; padding: 15px; border-bottom: 4px solid #D4AF37; position: sticky; top: 0; z-index: 100; }
-        .header-wrap { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .brand h1 { font-size: 1.1rem; margin: 0; font-weight: 900; }
-        .brand p { font-size: 0.6rem; color: #D4AF37; margin: 0; font-weight: bold; }
+        .nav-bar { background: #004A87; color: white; padding: 15px; border-bottom: 4px solid #D4AF37; position: sticky; top: 0; z-index: 1000; }
+        .nav-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        
+        .search-container { display: flex; background: white; border-radius: 8px; padding: 2px; width: 100%; max-width: 300px; }
+        .search-container input { flex: 1; border: none; padding: 10px; outline: none; font-size: 0.9rem; }
+        .search-container button { background: #004A87; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
 
-        .search-form { display: flex; background: white; border-radius: 8px; padding: 2px; width: 100%; max-width: 300px; }
-        .search-form input { flex: 1; border: none; padding: 8px; outline: none; font-size: 0.9rem; }
-        .search-form button { background: #004A87; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .main-body { max-width: 1200px; margin: 20px auto; padding: 0 15px; display: flex; flex-direction: column; gap: 20px; }
+        
+        .courses-wrapper { background: white; border-radius: 16px; padding: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .courses-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; }
+        .course-item { min-width: 200px; background: #fff; border: 2px solid #f1f5f9; padding: 15px; border-radius: 12px; cursor: pointer; text-align: left; transition: 0.3s; }
+        .course-item.active { border-color: #D4AF37; background: #fffdf5; box-shadow: 0 4px 12px rgba(212,175,55,0.1); }
 
-        .portal-body { max-width: 1200px; margin: 20px auto; padding: 0 15px; display: flex; flex-direction: column; gap: 20px; }
-        
-        /* SIDEBAR / CURSOS - RESPONSIVE */
-        .courses-container { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .courses-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
-        .courses-list::-webkit-scrollbar { display: none; }
-        
-        .course-card { min-width: 200px; flex-shrink: 0; background: #fff; border: 2px solid #f1f5f9; padding: 12px; border-radius: 12px; cursor: pointer; text-align: left; }
-        .course-card.active { border-color: #D4AF37; background: #fffdf5; }
+        .dashboard { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); flex: 1; }
+        .dashboard-head { background: #004A87; color: white; padding: 25px; text-align: center; }
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .stat-card { padding: 15px; text-align: center; border-right: 1px solid #e2e8f0; }
+        .stat-card small { display: block; font-size: 0.6rem; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
+        .stat-card b { color: #004A87; font-size: 1rem; }
 
-        /* DASHBOARD */
-        .dash-content { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .dash-header { background: #004A87; color: white; padding: 20px; text-align: center; }
-        
-        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); background: #fafafa; border-bottom: 1px solid #eee; }
-        .stat-box { padding: 12px; text-align: center; border-right: 1px solid #eee; }
-        .stat-box label { display: block; font-size: 0.55rem; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
-        .stat-box b { font-size: 0.9rem; color: #004A87; }
+        .weeks-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; padding: 20px; }
+        .week-box { border: 1px solid #e2e8f0; padding: 20px; border-radius: 16px; background: white; transition: 0.3s; }
+        .week-box:hover { border-color: #D4AF37; transform: translateY(-2px); }
 
-        .weeks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; padding: 20px; }
-        .week-card { border: 2px solid #f8fafc; padding: 15px; border-radius: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .week-tag { font-size: 0.6rem; font-weight: 900; color: #D4AF37; margin-bottom: 8px; }
+        /* BOTÓN DE SOPORTE FLOTANTE */
+        .support-btn { position: fixed; bottom: 25px; right: 25px; background: #25D366; color: white; padding: 15px 25px; border-radius: 50px; text-decoration: none; font-weight: bold; font-size: 0.9rem; box-shadow: 0 10px 20px rgba(37,211,102,0.3); z-index: 2000; display: flex; align-items: center; gap: 10px; }
         
-        .zoom-info { margin-top: 15px; padding: 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; }
-        .zoom-btn { display: block; background: #2D8CFF; color: white; padding: 10px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.75rem; margin-top: 8px; }
+        .loading-screen { height: 100vh; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #004a87; }
 
-        .loading-state { height: 100vh; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #004a87; }
-        
         @media (min-width: 900px) {
-          .portal-body { flex-direction: row; align-items: flex-start; }
-          .courses-container { width: 300px; flex-shrink: 0; }
-          .courses-list { flex-direction: column; overflow-x: visible; }
-          .course-card { min-width: auto; }
-          .brand h1 { font-size: 1.4rem; }
+          .main-body { flex-direction: row; align-items: flex-start; }
+          .courses-wrapper { width: 320px; flex-shrink: 0; }
+          .courses-scroll { flex-direction: column; overflow-x: visible; }
+          .course-item { min-width: auto; }
         }
       `}</style>
 
-      <header className="main-header">
-        <div className="header-wrap">
-          <div className="brand" onClick={() => setSelectedId(null)} style={{cursor:'pointer'}}>
-            <h1>PORTAL DOCENTE CREO</h1>
-            <p>UNIMAGDALENA • 16 SEMANAS</p>
+      <header className="nav-bar">
+        <div className="nav-content">
+          <div onClick={() => setSelectedId(null)} style={{cursor:'pointer'}}>
+            <h1 style={{margin:0}}>PORTAL DOCENTE</h1>
+            <p style={{margin:0, color:'#D4AF37'}}>UNIMAGDALENA • CREO</p>
           </div>
-          <form onSubmit={handleSearch} className="search-form">
-            <input type="text" placeholder="Cédula..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <form onSubmit={handleSearch} className="search-container">
+            <input type="text" placeholder="Cédula docente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             <button type="submit">BUSCAR</button>
           </form>
         </div>
       </header>
 
-      <main className="portal-body">
+      <main className="main-body">
         {!docente ? (
-          <div style={{textAlign:'center', padding:'80px 20px', width:'100%', color:'#94a3b8'}}>
-            <div style={{fontSize:'4rem'}}>📱</div>
+          <div style={{textAlign:'center', padding:'100px 20px', width:'100%', color:'#94a3b8'}}>
+            <div style={{fontSize:'4rem'}}>📅</div>
             <h2>Bienvenido</h2>
-            <p>Consulta tus horarios optimizados para cualquier dispositivo.</p>
+            <p>Portal optimizado para consulta rápida de horarios y salas virtuales.</p>
           </div>
         ) : (
           <>
-            <section className="courses-container">
-              <p style={{fontSize:'0.6rem', color:'#D4AF37', fontWeight:'900', marginBottom:'10px', textAlign:'center'}}>DESLIZA TUS CURSOS ↔️</p>
-              <div className="courses-list">
+            <section className="courses-wrapper">
+              <h3 style={{fontSize:'0.9rem', color:'#004a87', marginBottom:'15px', textAlign:'center'}}>ASIGNATURAS</h3>
+              <div className="courses-scroll">
                 {docente.cursos.map((c, i) => (
-                  <button key={i} onClick={() => setSelectedCursoIdx(i)} className={`course-card ${selectedCursoIdx === i ? 'active' : ''}`}>
-                    <b style={{fontSize:'0.8rem', color:'#004A87', display:'block'}}>{c.materia}</b>
-                    <small style={{fontSize:'0.65rem', color:'#94a3b8'}}>Grupo {c.grupo}</small>
+                  <button key={i} onClick={() => setSelectedCursoIdx(i)} className={`course-item ${selectedCursoIdx === i ? 'active' : ''}`}>
+                    <b style={{fontSize:'0.85rem', color:'#004A87', display:'block'}}>{c.materia}</b>
+                    <span style={{fontSize:'0.7rem', color:'#94a3b8'}}>Grupo {c.grupo}</span>
                   </button>
                 ))}
               </div>
             </section>
 
-            <section className="dash-content" style={{flex: 1}}>
-              <div className="dash-header">
-                <h2 style={{margin:0, fontSize:'1.1rem', textTransform:'uppercase'}}>{cursoActivo.materia}</h2>
+            <section className="dashboard">
+              <div className="dashboard-head">
+                <h2 style={{margin:0, fontSize:'1.2rem', textTransform:'uppercase'}}>{cursoActivo.materia}</h2>
               </div>
-              <div className="stats-grid">
-                <div className="stat-box"><label>Grupo</label><b>{cursoActivo.grupo}</b></div>
-                <div className="stat-box"><label>Créditos</label><b>{cursoActivo.creditos}</b></div>
-                <div className="stat-box"><label>Semanas</label><b>{cursoActivo.semanas.length}</b></div>
+              <div className="stats-row">
+                <div className="stat-card"><small>Grupo</small><b>{cursoActivo.grupo}</b></div>
+                <div className="stat-card"><small>Créditos</small><b>{cursoActivo.creditos}</b></div>
+                <div className="stat-card"><small>Semanas</small><b>{cursoActivo.semanas.length}</b></div>
               </div>
-              
-              <div className="weeks-grid">
+              <div className="weeks-list">
                 {cursoActivo.semanas.map((s, idx) => (
-                  <div key={idx} className="week-card">
-                    <div className="week-tag">SEMANA {s.num}</div>
+                  <div key={idx} className="week-box">
+                    <div style={{fontSize:'0.6rem', color:'#D4AF37', fontWeight:'900', marginBottom:'10px'}}>SEMANA {s.num}</div>
                     <div style={{fontSize:'0.9rem', fontWeight:'bold', marginBottom:'5px'}}>📅 {s.fecha}</div>
                     <div style={{fontSize:'0.8rem', color:'#64748b'}}>⏰ {s.hora}</div>
-                    
-                    {s.zoomId ? (
-                      <div className="zoom-info">
-                        <div style={{fontSize:'0.7rem', color:'#004A87', fontWeight:'900', marginBottom:'5px'}}>ID SALA: {s.zoomId}</div>
-                        <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-btn">ENTRAR A ZOOM 🎥</a>
+                    {s.zoomId && (
+                      <div style={{marginTop:'15px', background:'#f1f5f9', padding:'10px', borderRadius:'10px'}}>
+                        <div style={{fontSize:'0.7rem', color:'#004A87', fontWeight:'900', marginBottom:'5px'}}>SALA ID: {s.zoomId}</div>
+                        <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-btn">ENTRAR A CLASE 🎥</a>
                       </div>
-                    ) : (
-                      <div style={{fontSize:'0.65rem', color:'#cbd5e1', fontStyle:'italic', marginTop:'15px', textAlign:'center'}}>Sala no disponible</div>
                     )}
                   </div>
                 ))}
@@ -189,6 +178,16 @@ const App = () => {
           </>
         )}
       </main>
+
+      {/* BOTÓN FLOTANTE DE SOPORTE */}
+      <a 
+        href="https://wa.me/573000000000" // REEMPLAZA CON TU NÚMERO
+        target="_blank" 
+        rel="noreferrer" 
+        className="support-btn"
+      >
+        <span>💬 Soporte Técnico</span>
+      </a>
     </div>
   );
 };
