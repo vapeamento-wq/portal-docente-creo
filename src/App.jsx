@@ -1,35 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- 1. IMPORTAMOS LIBRERÍAS DE FIREBASE ---
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
+// --- CONFIGURACIÓN GENERAL ---
 
-// --- 2. CONFIGURACIÓN DE TU PROYECTO (Tus Credenciales Reales) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCQDcFCVrpesMllsImPpppiK8MS3zcd0oE",
-  authDomain: "portal-creo.firebaseapp.com",
-  projectId: "portal-creo",
-  storageBucket: "portal-creo.firebasestorage.app",
-  messagingSenderId: "140879711888",
-  appId: "1:140879711888:web:8b1b24634ff49b33701215"
-};
-
-// Inicializamos la conexión con la Nube
-// Usamos try/catch para que si falla la nube, la app siga funcionando
-let app, db;
-try {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-} catch (e) {
-  console.error("Error inicializando Firebase:", e);
-}
-
-// --- 3. CONFIGURACIÓN GENERAL ---
-// Url con respaldo por si falla la variable de entorno
+// 1. URL DE LA BASE DE DATOS DE DOCENTES (HORARIOS)
 const URL_CSV = 
   import.meta.env?.VITE_SHEET_URL || 
   process.env?.REACT_APP_SHEET_URL || 
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
+
+// 2. URL DEL SCRIPT (Conector con Drive)
+const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbxmvuy0L8BT-PzJnD98_gnyjw342BtcALKQDf1kEqhAW9G_IXWRM85kyVh786KmaMibxQ/exec";
+
+// 3. TU HOJA DE CÁLCULO DE HISTORIAL
+const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/edit?gid=0#gid=0";
+// Versión para incrustar (Preview)
+const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/preview?gid=0";
 
 const WHATSAPP_NUMBER = "573106964025";
 const ADMIN_PASS = "admincreo"; 
@@ -44,11 +29,7 @@ const App = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
 
-  // Estados para el Historial Real (Firebase)
-  const [logs, setLogs] = useState([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
-
-  // --- EFECTO 1: CARGAR HORARIOS DESDE EXCEL ---
+  // --- EFECTO: CARGAR HORARIOS ---
   useEffect(() => {
     fetch(URL_CSV)
       .then(res => res.text())
@@ -100,59 +81,33 @@ const App = () => {
       .catch(err => setState(s => ({ ...s, loading: false, error: "Error conectando con la base de datos académica." })));
   }, []);
 
-  // --- FUNCIÓN PARA LEER LOGS REALES (ADMIN) ---
-  const fetchLogs = async () => {
-    if (!db) return; // Si no hay base de datos, no hacemos nada
-    setLoadingLogs(true);
-    try {
-      // Traemos las últimas 50 consultas ordenadas por fecha
-      const q = query(collection(db, "consultas"), orderBy("fechaIso", "desc"), limit(50));
-      const querySnapshot = await getDocs(q);
-      const historial = [];
-      querySnapshot.forEach((doc) => {
-        historial.push(doc.data());
-      });
-      setLogs(historial);
-    } catch (e) {
-      console.error("Error leyendo Firebase: ", e);
-      // Mensaje amigable si falla la lectura (ej: permisos o modo prueba expirado)
-      setLogs([{ fecha: 'Sistema', doc: 'No se pudo leer el historial (Verificar Firebase)', estado: '⚠️' }]);
-    }
-    setLoadingLogs(false);
-  };
-
-  // Cargar logs al entrar al admin
-  useEffect(() => {
-    if (view === 'admin') {
-      fetchLogs();
-    }
-  }, [view]);
-
-  // --- MANEJO DE BÚSQUEDA (CON GUARDADO EN NUBE) ---
-  const handleSearch = async (e) => {
+  // --- FUNCIÓN DE BÚSQUEDA Y ENVÍO A DRIVE ---
+  const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
     const encontrado = !!state.teachers[idBusqueda];
     
-    // ☁️ GUARDAR EN FIREBASE (INTENTO SEGURO)
-    if (db && idBusqueda) {
-        try {
-        await addDoc(collection(db, "consultas"), {
-            fecha: new Date().toLocaleString('es-CO'),
-            fechaIso: new Date().toISOString(),
-            doc: idBusqueda,
-            estado: encontrado ? '✅ Éxito' : '❌ Fallido',
-            plataforma: navigator.platform || 'Web'
-        });
-        } catch (e) {
-        console.error("No se pudo guardar el log en la nube (pero la app sigue): ", e);
-        }
-    }
-
+    // 1. Mostrar resultado al usuario DE INMEDIATO
     if (encontrado) {
       setSelectedId(idBusqueda);
       setSelectedCursoIdx(0);
     } else { alert("Identificación no encontrada en el sistema."); }
+
+    // 2. Enviar datos a Google Drive (Silenciosamente)
+    if (idBusqueda) {
+      const datosLog = {
+        fecha: new Date().toLocaleString('es-CO'),
+        doc: idBusqueda,
+        estado: encontrado ? '✅ Éxito' : '❌ Fallido'
+      };
+
+      fetch(URL_SCRIPT_APPS, {
+        method: "POST",
+        mode: "no-cors", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(datosLog)
+      }).catch(err => console.log("Error guardando log:", err));
+    }
   };
 
   const handleLogin = (e) => {
@@ -163,75 +118,54 @@ const App = () => {
 
   const handleReset = () => { setSelectedId(null); setSearchTerm(''); setSelectedCursoIdx(0); };
 
-  // --- VISTA ADMIN (CONECTADA A NUBE) ---
+  // --- VISTA ADMIN (CON EXCEL INCRUSTADO) ---
   if (view === 'admin') {
     return (
-      <div style={{fontFamily:'Segoe UI, sans-serif', background:'#f4f6f8', minHeight:'100vh', padding:'20px'}}>
-        <div style={{maxWidth:'1000px', margin:'0 auto'}}>
-          <header style={{background:'#2c3e50', color:'white', padding:'20px', borderRadius:'10px', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
-            <div>
-              <h2 style={{margin:0}}>PANEL DE CONTROL</h2>
-              <small style={{color:'#f1c40f'}}>AUDITORÍA EN LA NUBE (FIREBASE)</small>
-            </div>
-            <div style={{display:'flex', gap:'10px'}}>
-              <button onClick={fetchLogs} style={{background:'rgba(255,255,255,0.2)', color:'white', border:'none', padding:'8px 15px', borderRadius:'5px', cursor:'pointer'}}>↻ Refrescar</button>
-              <button onClick={()=>setView('user')} style={{background:'white', border:'none', padding:'8px 15px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold', color:'#2c3e50'}}>SALIR</button>
-            </div>
-          </header>
+      <div style={{fontFamily:'Segoe UI, sans-serif', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
+        <div style={{maxWidth:'1000px', width:'100%', background:'white', padding:'30px', borderRadius:'15px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)'}}>
           
-          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(250px, 1fr))', gap:'20px', marginBottom:'30px'}}>
-            <div style={{background:'white', padding:'20px', borderRadius:'10px', borderLeft:'5px solid #27ae60', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-              <h4 style={{margin:'0 0 10px 0', color:'#7f8c8d'}}>ESTADO SERVIDOR</h4>
-              <b style={{color:'#27ae60', fontSize:'1.2rem'}}>CONECTADO 🟢</b>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', flexWrap:'wrap', gap:'10px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+              <span style={{fontSize:'2rem'}}>📂</span>
+              <div>
+                <h2 style={{color:'#003366', margin:0}}>AUDITORÍA GOOGLE DRIVE</h2>
+                <small style={{color:'#666'}}>Visualización en Tiempo Real</small>
+              </div>
             </div>
-            <div style={{background:'white', padding:'20px', borderRadius:'10px', borderLeft:'5px solid #2980b9', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-              <h4 style={{margin:'0 0 10px 0', color:'#7f8c8d'}}>REGISTROS EN PANTALLA</h4>
-              <b style={{color:'#2c3e50', fontSize:'1.5rem'}}>{logs.length}</b>
+            
+            <div style={{display:'flex', gap:'10px'}}>
+              <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px 15px', borderRadius:'8px', fontWeight:'bold', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'5px'}}>
+                <span>↗</span> Abrir en Pestaña Nueva
+              </a>
+              <button onClick={()=>setView('user')} style={{background:'#f1f5f9', color:'#334155', border:'none', padding:'10px 15px', borderRadius:'8px', fontWeight:'bold', cursor:'pointer', fontSize:'0.9rem'}}>
+                ⬅ Salir
+              </button>
             </div>
           </div>
 
-          <div style={{background:'white', borderRadius:'10px', padding:'20px', boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
-            <h3 style={{marginTop:0, borderBottom:'1px solid #eee', paddingBottom:'15px'}}>Historial de Accesos</h3>
-            {loadingLogs ? <p style={{textAlign:'center', color:'#888'}}>Cargando datos desde Google Cloud...</p> : (
-              <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem'}}>
-                <thead>
-                  <tr style={{background:'#f8f9fa', textAlign:'left'}}>
-                    <th style={{padding:'10px'}}>Fecha y Hora</th>
-                    <th style={{padding:'10px'}}>Documento</th>
-                    <th style={{padding:'10px'}}>Resultado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((l, i) => (
-                    <tr key={i} style={{borderBottom:'1px solid #eee'}}>
-                      <td style={{padding:'10px'}}>{l.fecha}</td>
-                      <td style={{padding:'10px'}}><b>{l.doc}</b></td>
-                      <td style={{padding:'10px'}}>
-                        <span style={{
-                          color: l.estado.includes('Éxito')?'#27ae60':'#c0392b', 
-                          background: l.estado.includes('Éxito')?'#eafaf1':'#fdedec',
-                          padding:'4px 8px', borderRadius:'4px', fontWeight:'bold', fontSize:'0.8rem'
-                        }}>
-                          {l.estado}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {logs.length === 0 && (
-                    <tr><td colSpan="3" style={{padding:'20px', textAlign:'center', color:'#888'}}>No hay registros aún. Realiza una búsqueda para probar.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            )}
+          {/* ÁREA DE VISUALIZACIÓN INCRUSTADA */}
+          <div style={{width:'100%', height:'500px', border:'2px solid #e2e8f0', borderRadius:'10px', overflow:'hidden', background:'#f8fafc', position:'relative'}}>
+             <iframe 
+                src={URL_EMBED_LOGS} 
+                style={{width:'100%', height:'100%', border:'none'}}
+                title="Historial Logs"
+             ></iframe>
+             <div style={{position:'absolute', bottom:'0', width:'100%', background:'rgba(255,255,255,0.9)', padding:'5px', fontSize:'0.7rem', textAlign:'center', color:'#888'}}>
+               Si no puedes ver el archivo, usa el botón "Abrir en Pestaña Nueva"
+             </div>
+          </div>
+
+          <div style={{marginTop:'20px', padding:'15px', background:'#fffdf5', borderLeft:'4px solid #D4AF37', borderRadius:'4px', fontSize:'0.85rem', color:'#856404'}}>
+            ℹ️ <b>Nota:</b> Los nuevos registros aparecerán automáticamente al final de la hoja. Si no los ves, refresca esta página o usa el botón verde.
           </div>
         </div>
       </div>
     );
   }
 
-  // --- VISTA USUARIO (PORTAL) ---
-  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Iniciando Sistema...</p></div>;
-  if (state.error) return <div className="error-screen"><h3>⚠️ Error Crítico</h3><p>{state.error}</p></div>;
+  // --- VISTA USUARIO (PORTAL) - SIN CAMBIOS ---
+  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando Portal...</p></div>;
+  if (state.error) return <div className="error-screen"><h3>⚠️ Error</h3><p>{state.error}</p></div>;
 
   return (
     <div className="portal-container">
@@ -254,14 +188,12 @@ const App = () => {
         .welcome-note { margin-top: 25px; font-size: 0.95rem; color: #888; font-style: italic; background: #f8fafc; display: inline-block; padding: 10px 20px; border-radius: 50px; }
         .sidebar { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .prof-info h3 { margin: 0; color: var(--primary); font-size: 1.2rem; }
-        .prof-info span { font-size: 0.8rem; color: #666; display: block; margin-top: 5px; }
         .nav-title { font-size: 0.7rem; color: var(--secondary); font-weight: 800; text-transform: uppercase; margin: 20px 0 10px; display: block; }
         .courses-nav { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
         .course-btn { min-width: 220px; text-align: left; background: #fff; border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; cursor: pointer; position: relative; }
         .course-btn.active { background: #fdfcf5; border-color: var(--secondary); border-left: 5px solid var(--secondary); }
         .dashboard { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); flex: 1; }
         .dash-head { background: var(--primary); color: white; padding: 25px 30px; }
-        .dash-head h3 { margin: 0; font-size: 1.3rem; font-weight: 600; text-transform: uppercase; }
         .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); background: #f9f9f9; border-bottom: 1px solid #eee; }
         .stat { padding: 20px; text-align: center; border-right: 1px solid #eee; }
         .stat span { font-size: 1.1rem; color: var(--primary); font-weight: 700; }
