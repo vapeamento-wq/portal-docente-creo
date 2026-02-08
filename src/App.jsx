@@ -140,4 +140,21 @@ const App = () => {
               <div className="weeks">
                 {cursoActivo.semanas.map((s, idx) => (
                   <div key={idx} className="week-card">
-                    <div style={{fontSize:'0.65rem', fontWeight:'bold', color
+                    <div style={{fontSize:'0.65rem', fontWeight:'bold', color:'#D4AF37', marginBottom:'8px'}}>SEMANA {idx + 1}</div>
+                    <div style={{fontSize:'0.8rem', fontWeight:'bold', marginBottom:'4px'}}>📅 {s.fecha}</div>
+                    <div style={{fontSize:'0.75rem', color:'#64748b'}}>⏰ {s.hora}</div>
+                    {s.zoomId && (
+                      <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-link">ENTRAR A ZOOM (ID: {s.zoomId})</a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default App;
