@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- CONFIGURACIÓN SEGURA (Sin experimentos raros) ---
-const URL_CSV = 
-  import.meta.env?.VITE_SHEET_URL || 
-  process.env?.REACT_APP_SHEET_URL || 
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
+// --- CONFIGURACIÓN DE EMERGENCIA (SIN DEPENDENCIAS EXTERNAS) ---
+// Usamos el link directo al CSV para evitar problemas de variables de entorno
+const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
 
 const WHATSAPP_NUMBER = "573106964025";
 const ADMIN_PASS = "admincreo"; 
@@ -19,16 +17,16 @@ const App = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
 
-  // --- MEMORIA LOCAL (ESTO NO FALLA) ---
-  // Guarda el historial en el navegador del PC/Celular
+  // --- MEMORIA LOCAL (PARA EL ADMIN) ---
+  // Esto guarda el historial en el navegador del usuario. No falla nunca.
   const [logs, setLogs] = useState(() => {
     try {
-      const saved = localStorage.getItem('admin_logs_v1');
+      const saved = localStorage.getItem('backup_logs');
       return saved ? JSON.parse(saved) : [];
     } catch (e) { return []; }
   });
 
-  // --- CARGA DE DATOS (MÉTODO CLÁSICO) ---
+  // --- CARGA DE DATOS ---
   useEffect(() => {
     fetch(URL_CSV)
       .then(res => res.text())
@@ -80,22 +78,22 @@ const App = () => {
       .catch(err => setState(s => ({ ...s, loading: false, error: "Error conectando con la base de datos." })));
   }, []);
 
-  // --- BÚSQUEDA Y GUARDADO SEGURO ---
+  // --- BÚSQUEDA ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
     const encontrado = !!state.teachers[idBusqueda];
     
-    // Guardamos en memoria local (100% seguro, no bloquea)
+    // Guardar Log Localmente
     const nuevoLog = {
       fecha: new Date().toLocaleString('es-CO'),
       doc: idBusqueda || "Vacío",
       estado: encontrado ? '✅ Éxito' : '❌ Fallido'
     };
     
-    const nuevosLogs = [nuevoLog, ...logs].slice(0, 50); // Guardamos los ultimos 50
+    const nuevosLogs = [nuevoLog, ...logs].slice(0, 50);
     setLogs(nuevosLogs);
-    localStorage.setItem('admin_logs_v1', JSON.stringify(nuevosLogs));
+    localStorage.setItem('backup_logs', JSON.stringify(nuevosLogs));
 
     if (encontrado) {
       setSelectedId(idBusqueda);
@@ -104,16 +102,16 @@ const App = () => {
   };
 
   const clearLogs = () => {
-    if(window.confirm("¿Borrar historial local?")) {
+    if(window.confirm("¿Limpiar historial?")) {
       setLogs([]);
-      localStorage.removeItem('admin_logs_v1');
+      localStorage.removeItem('backup_logs');
     }
   };
 
   const handleLogin = (e) => {
     e.preventDefault();
     if (passInput === ADMIN_PASS) setView('admin');
-    else alert("Incorrecto");
+    else alert("Clave incorrecta");
   };
 
   const handleReset = () => { setSelectedId(null); setSearchTerm(''); setSelectedCursoIdx(0); };
@@ -126,7 +124,7 @@ const App = () => {
           <header style={{background:'#2c3e50', color:'white', padding:'20px', borderRadius:'10px', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
             <div>
               <h2 style={{margin:0}}>PANEL DE CONTROL</h2>
-              <small style={{color:'#f1c40f'}}>MODO SEGURO (MEMORIA LOCAL)</small>
+              <small style={{color:'#f1c40f'}}>MODO RESTAURACIÓN</small>
             </div>
             <div style={{display:'flex', gap:'10px'}}>
               <button onClick={clearLogs} style={{background:'rgba(231,76,60,0.2)', color:'#ffadad', border:'1px solid #e74c3c', padding:'8px', borderRadius:'5px', cursor:'pointer'}}>Borrar</button>
@@ -135,7 +133,7 @@ const App = () => {
           </header>
           
           <div style={{background:'white', borderRadius:'10px', padding:'20px', boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
-            <h3 style={{marginTop:0, borderBottom:'1px solid #eee', paddingBottom:'15px'}}>Historial de Consultas</h3>
+            <h3 style={{marginTop:0, borderBottom:'1px solid #eee', paddingBottom:'15px'}}>Historial Reciente</h3>
             <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem'}}>
               <thead>
                 <tr style={{background:'#f8f9fa', textAlign:'left'}}>
@@ -152,7 +150,6 @@ const App = () => {
                     <td style={{padding:'10px', color: l.estado.includes('Éxito')?'green':'red'}}>{l.estado}</td>
                   </tr>
                 ))}
-                {logs.length === 0 && <tr><td colSpan="3" style={{padding:'20px', textAlign:'center', color:'#888'}}>Sin registros recientes.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -161,8 +158,8 @@ const App = () => {
     );
   }
 
-  // --- VISTA USUARIO (PORTAL) ---
-  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando...</p></div>;
+  // --- VISTA USUARIO ---
+  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando Portal...</p></div>;
   if (state.error) return <div className="error-screen"><h3>⚠️ Error</h3><p>{state.error}</p></div>;
 
   return (
@@ -305,3 +302,5 @@ const App = () => {
     </div>
   );
 };
+
+export default App;
