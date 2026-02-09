@@ -3,17 +3,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 // --- CONFIGURACIÓN GENERAL ---
 
 // 1. URL DE LA BASE DE DATOS DE DOCENTES (HORARIOS)
+// Intenta leer de Vercel, si no, usa el respaldo directo
 const URL_CSV = 
   import.meta.env?.VITE_SHEET_URL || 
   process.env?.REACT_APP_SHEET_URL || 
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
 
-// 2. URL DEL SCRIPT (Conector con Drive)
+// 2. URL DEL SCRIPT (Conector para guardar en Drive)
 const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbxmvuy0L8BT-PzJnD98_gnyjw342BtcALKQDf1kEqhAW9G_IXWRM85kyVh786KmaMibxQ/exec";
 
-// 3. TU HOJA DE CÁLCULO DE HISTORIAL
+// 3. TU HOJA DE CÁLCULO DE HISTORIAL (LOGS)
 const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/edit?gid=0#gid=0";
-// Versión para incrustar (Preview)
+// Versión para incrustar en el panel (Preview)
 const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/preview?gid=0";
 
 const WHATSAPP_NUMBER = "573106964025";
