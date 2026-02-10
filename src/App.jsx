@@ -1,23 +1,31 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- CONFIGURACIÓN ESTÁTICA (SIN RIESGOS) ---
+// --- CONFIGURACIÓN BLINDADA (LINKS DIRECTOS - SIN ERRORES DE ENTORNO) ---
+
+// 1. Tu Base de Datos de Docentes (CSV)
 const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
 
-// Tu Excel de Admin (Solo visual, enlace directo)
-const URL_ADMIN_EXCEL = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/edit?gid=0#gid=0";
+// 2. Tu Script para guardar el historial (El que conecta con Drive)
+const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbxmvuy0L8BT-PzJnD98_gnyjw342BtcALKQDf1kEqhAW9G_IXWRM85kyVh786KmaMibxQ/exec";
+
+// 3. Tu Excel de Historial (Para verlo en el Admin)
+const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/edit?gid=0#gid=0";
+const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/preview?gid=0";
 
 const WHATSAPP_NUMBER = "573106964025";
 const ADMIN_PASS = "admincreo"; 
 
 const App = () => {
+  // --- ESTADOS ---
   const [view, setView] = useState('user'); 
   const [passInput, setPassInput] = useState('');
+  
   const [state, setState] = useState({ loading: true, teachers: {}, error: null });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
 
-  // --- CARGA DE DATOS (SIMPLE Y ROBUSTA) ---
+  // --- CARGA DE DATOS ---
   useEffect(() => {
     fetch(URL_CSV)
       .then(res => res.text())
@@ -66,20 +74,50 @@ const App = () => {
         });
         setState({ loading: false, teachers: diccionario, error: null });
       })
-      .catch(err => setState(s => ({ ...s, loading: false, error: "Error de conexión con la base de datos." })));
+      .catch(err => setState(s => ({ ...s, loading: false, error: "Error conectando con la base de datos." })));
   }, []);
 
   const docente = useMemo(() => selectedId ? state.teachers[selectedId] : null, [selectedId, state.teachers]);
   const cursoActivo = docente ? docente.cursos[selectedCursoIdx] : null;
 
+  // --- BÚSQUEDA Y REGISTRO EN DRIVE ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
-    if (state.teachers[idBusqueda]) {
+    const encontrado = !!state.teachers[idBusqueda];
+    
+    // 1. Mostrar resultado DE INMEDIATO (Prioridad visual)
+    if (encontrado) {
       setSelectedId(idBusqueda);
       setSelectedCursoIdx(0);
     } else { 
-      alert("Identificación no encontrada."); 
+      alert("Identificación no encontrada en el sistema."); 
+    }
+
+    // 2. Enviar datos a Google Drive (Segundo plano - No bloqueante)
+    if (idBusqueda) {
+      const datosLog = {
+        fecha: new Date().toLocaleString('es-CO'),
+        doc: idBusqueda,
+        estado: encontrado ? '✅ Éxito' : '❌ Fallido'
+      };
+
+      // Usamos 'no-cors' y un catch para que NUNCA rompa la página si falla el script
+      fetch(URL_SCRIPT_APPS, {
+        method: "POST",
+        mode: "no-cors", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(datosLog)
+      }).catch(err => console.log("Nota: El log no se pudo guardar, pero el portal funciona.", err));
+    }
+  };
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (passInput === ADMIN_PASS) {
+      setView('admin');
+    } else {
+      alert("Contraseña incorrecta");
     }
   };
 
@@ -89,22 +127,49 @@ const App = () => {
     setSelectedCursoIdx(0);
   };
 
-  // --- VISTA ADMIN (SIMPLIFICADA) ---
+  // --- VISTA ADMIN (CON VISOR DE EXCEL) ---
   if (view === 'admin') {
     return (
-      <div style={{fontFamily:'Segoe UI, sans-serif', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', alignItems:'center', justifyContent:'center'}}>
-        <div style={{background:'white', padding:'40px', borderRadius:'15px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)', textAlign:'center', maxWidth:'500px'}}>
-          <h2 style={{color:'#003366'}}>PANEL ADMINISTRATIVO</h2>
-          <p>Acceso directo a la gestión de datos.</p>
-          <a href={URL_ADMIN_EXCEL} target="_blank" rel="noreferrer" style={{display:'block', background:'#27ae60', color:'white', textDecoration:'none', padding:'15px', borderRadius:'8px', fontWeight:'bold', margin:'20px 0'}}>
-            ABRIR GOOGLE DRIVE (EXCEL) 📂
-          </a>
-          <button onClick={()=>setView('user')} style={{padding:'10px 20px', cursor:'pointer'}}>Volver al Portal</button>
+      <div style={{fontFamily:'Segoe UI, sans-serif', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
+        <div style={{maxWidth:'1000px', width:'100%', background:'white', padding:'30px', borderRadius:'15px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)'}}>
+          
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', flexWrap:'wrap', gap:'10px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+              <span style={{fontSize:'2rem'}}>📂</span>
+              <div>
+                <h2 style={{color:'#003366', margin:0}}>PANEL ADMINISTRATIVO</h2>
+                <small style={{color:'#666'}}>Auditoría en Tiempo Real</small>
+              </div>
+            </div>
+            
+            <div style={{display:'flex', gap:'10px'}}>
+              <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px 15px', borderRadius:'8px', fontWeight:'bold', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'5px'}}>
+                <span>↗</span> Abrir Excel Completo
+              </a>
+              <button onClick={()=>setView('user')} style={{background:'#f1f5f9', color:'#334155', border:'none', padding:'10px 15px', borderRadius:'8px', fontWeight:'bold', cursor:'pointer', fontSize:'0.9rem'}}>
+                ⬅ Salir
+              </button>
+            </div>
+          </div>
+
+          {/* VISOR DE EXCEL INCRUSTADO */}
+          <div style={{width:'100%', height:'500px', border:'2px solid #e2e8f0', borderRadius:'10px', overflow:'hidden', background:'#f8fafc', position:'relative'}}>
+             <iframe 
+                src={URL_EMBED_LOGS} 
+                style={{width:'100%', height:'100%', border:'none'}}
+                title="Historial Logs"
+             ></iframe>
+             <div style={{position:'absolute', bottom:'0', width:'100%', background:'rgba(255,255,255,0.9)', padding:'5px', fontSize:'0.7rem', textAlign:'center', color:'#888'}}>
+               Si no carga la vista previa, usa el botón verde de arriba.
+             </div>
+          </div>
+          
         </div>
       </div>
     );
   }
 
+  // --- VISTA PÚBLICA (PORTAL DOCENTE) ---
   if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando Portal...</p></div>;
   if (state.error) return <div className="error-screen"><h3>⚠️ Error</h3><p>{state.error}</p></div>;
 
@@ -129,14 +194,12 @@ const App = () => {
         .welcome-note { margin-top: 25px; font-size: 0.95rem; color: #888; font-style: italic; background: #f8fafc; display: inline-block; padding: 10px 20px; border-radius: 50px; }
         .sidebar { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .prof-info h3 { margin: 0; color: var(--primary); font-size: 1.2rem; }
-        .prof-info span { font-size: 0.8rem; color: #666; display: block; margin-top: 5px; }
         .nav-title { font-size: 0.7rem; color: var(--secondary); font-weight: 800; text-transform: uppercase; margin: 20px 0 10px; display: block; }
         .courses-nav { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
         .course-btn { min-width: 220px; text-align: left; background: #fff; border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; cursor: pointer; position: relative; }
         .course-btn.active { background: #fdfcf5; border-color: var(--secondary); border-left: 5px solid var(--secondary); }
         .dashboard { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); flex: 1; }
         .dash-head { background: var(--primary); color: white; padding: 25px 30px; }
-        .dash-head h3 { margin: 0; font-size: 1.3rem; font-weight: 600; text-transform: uppercase; }
         .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); background: #f9f9f9; border-bottom: 1px solid #eee; }
         .stat { padding: 20px; text-align: center; border-right: 1px solid #eee; }
         .stat span { font-size: 1.1rem; color: var(--primary); font-weight: 700; }
@@ -161,7 +224,7 @@ const App = () => {
 
       {view === 'login' && (
         <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}}>
-          <form onSubmit={(e) => { e.preventDefault(); if(passInput === ADMIN_PASS) setView('admin'); else alert("Error"); }} style={{background:'white', padding:'30px', borderRadius:'10px', width:'300px', textAlign:'center'}}>
+          <form onSubmit={handleLogin} style={{background:'white', padding:'30px', borderRadius:'10px', width:'300px', textAlign:'center'}}>
             <h3 style={{color:'var(--primary)', marginTop:0}}>Acceso Admin</h3>
             <input type="password" placeholder="Contraseña..." value={passInput} onChange={(e)=>setPassInput(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ddd', borderRadius:'5px'}} autoFocus />
             <div style={{display:'flex', gap:'10px'}}>
