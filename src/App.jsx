@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- CONFIGURACIÓN BLINDADA (LINKS DIRECTOS - SIN ERRORES DE ENTORNO) ---
-
-// 1. Tu Base de Datos de Docentes (CSV)
+// --- CONFIGURACIÓN BLINDADA ---
 const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
 
-// 2. Tu Script para guardar el historial (El que conecta con Drive)
+// CONEXIÓN A GOOGLE DRIVE (HISTORIAL)
 const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbxmvuy0L8BT-PzJnD98_gnyjw342BtcALKQDf1kEqhAW9G_IXWRM85kyVh786KmaMibxQ/exec";
 
-// 3. Tu Excel de Historial (Para verlo en el Admin)
+// VISUALIZACIÓN ADMIN
 const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/edit?gid=0#gid=0";
 const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/preview?gid=0";
 
@@ -24,6 +22,26 @@ const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
+
+  // --- FUNCIÓN CENTRAL DE REGISTRO (LOGS) ---
+  const registrarLog = (documento, accion) => {
+    try {
+      const datosLog = {
+        fecha: new Date().toLocaleString('es-CO'),
+        doc: documento,
+        estado: accion
+      };
+      
+      // Enviamos a Google Drive sin detener la página
+      fetch(URL_SCRIPT_APPS, {
+        method: "POST",
+        mode: "no-cors", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(datosLog)
+      }).catch(err => console.log("Log error:", err));
+      
+    } catch (e) { console.error("Error registrando:", e); }
+  };
 
   // --- CARGA DE DATOS ---
   useEffect(() => {
@@ -80,45 +98,26 @@ const App = () => {
   const docente = useMemo(() => selectedId ? state.teachers[selectedId] : null, [selectedId, state.teachers]);
   const cursoActivo = docente ? docente.cursos[selectedCursoIdx] : null;
 
-  // --- BÚSQUEDA Y REGISTRO EN DRIVE ---
+  // --- BÚSQUEDA ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
     const encontrado = !!state.teachers[idBusqueda];
     
-    // 1. Mostrar resultado DE INMEDIATO (Prioridad visual)
     if (encontrado) {
       setSelectedId(idBusqueda);
       setSelectedCursoIdx(0);
+      registrarLog(idBusqueda, '✅ Consulta Exitosa'); // REGISTRO BÚSQUEDA
     } else { 
-      alert("Identificación no encontrada en el sistema."); 
-    }
-
-    // 2. Enviar datos a Google Drive (Segundo plano - No bloqueante)
-    if (idBusqueda) {
-      const datosLog = {
-        fecha: new Date().toLocaleString('es-CO'),
-        doc: idBusqueda,
-        estado: encontrado ? '✅ Éxito' : '❌ Fallido'
-      };
-
-      // Usamos 'no-cors' y un catch para que NUNCA rompa la página si falla el script
-      fetch(URL_SCRIPT_APPS, {
-        method: "POST",
-        mode: "no-cors", 
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(datosLog)
-      }).catch(err => console.log("Nota: El log no se pudo guardar, pero el portal funciona.", err));
+      alert("Identificación no encontrada en el sistema.");
+      if (idBusqueda) registrarLog(idBusqueda, '❌ Fallido'); // REGISTRO FALLO
     }
   };
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passInput === ADMIN_PASS) {
-      setView('admin');
-    } else {
-      alert("Contraseña incorrecta");
-    }
+    if (passInput === ADMIN_PASS) setView('admin');
+    else alert("Contraseña incorrecta");
   };
 
   const handleReset = () => {
@@ -127,7 +126,7 @@ const App = () => {
     setSelectedCursoIdx(0);
   };
 
-  // --- VISTA ADMIN (CON VISOR DE EXCEL) ---
+  // --- VISTA ADMIN ---
   if (view === 'admin') {
     return (
       <div style={{fontFamily:'Segoe UI, sans-serif', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
@@ -144,7 +143,7 @@ const App = () => {
             
             <div style={{display:'flex', gap:'10px'}}>
               <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px 15px', borderRadius:'8px', fontWeight:'bold', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'5px'}}>
-                <span>↗</span> Abrir Excel Completo
+                <span>↗</span> Abrir Excel
               </a>
               <button onClick={()=>setView('user')} style={{background:'#f1f5f9', color:'#334155', border:'none', padding:'10px 15px', borderRadius:'8px', fontWeight:'bold', cursor:'pointer', fontSize:'0.9rem'}}>
                 ⬅ Salir
@@ -152,7 +151,6 @@ const App = () => {
             </div>
           </div>
 
-          {/* VISOR DE EXCEL INCRUSTADO */}
           <div style={{width:'100%', height:'500px', border:'2px solid #e2e8f0', borderRadius:'10px', overflow:'hidden', background:'#f8fafc', position:'relative'}}>
              <iframe 
                 src={URL_EMBED_LOGS} 
@@ -169,7 +167,7 @@ const App = () => {
     );
   }
 
-  // --- VISTA PÚBLICA (PORTAL DOCENTE) ---
+  // --- VISTA PÚBLICA ---
   if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando Portal...</p></div>;
   if (state.error) return <div className="error-screen"><h3>⚠️ Error</h3><p>{state.error}</p></div>;
 
@@ -294,7 +292,15 @@ const App = () => {
                     {s.zoomId ? (
                       <div className="zoom-area">
                         <span className="zoom-id">ID: {s.zoomId}</span>
-                        <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-link">ENTRAR A CLASE</a>
+                        <a 
+                           href={s.zoomLink} 
+                           target="_blank" 
+                           rel="noreferrer" 
+                           className="zoom-link"
+                           onClick={() => registrarLog(docente.idReal, `🎥 Click Zoom Sem ${s.num}`)}
+                        >
+                          ENTRAR A CLASE
+                        </a>
                       </div>
                     ) : (
                       <div style={{marginTop:'15px', fontStyle:'italic', color:'#aaa', fontSize:'0.8rem', textAlign:'center'}}>Sin sala asignada</div>
