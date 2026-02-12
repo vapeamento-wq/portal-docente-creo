@@ -1,15 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- CONFIGURACIÓN DE LABORATORIO 🧪 (DATOS DE PRUEBA) ---
-// Usamos los datos de prueba para que el portal sea seguro de usar sin dañar el real.
-
-// 1. BASE DE DATOS DE PRUEBA
+// --- CONFIGURACIÓN DE LABORATORIO 🧪 ---
 const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQqVxPhQsuX9SKXsPSj9P5iaL__B0eAt7jzVj8HMnxKW6QTkD6IUuS9eFYTwYep2G6x2rn8uKlfnvsO/pub?output=csv";
-
-// 2. SCRIPT DE LOGS DE PRUEBA
 const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbxXAXa1VXPf8mKv0x_yZ__dnRNIMP9yZrIWO1xXvN24V76WWs9jt6O6T5ut_HLPVtyI/exec";
-
-// 3. VISOR DEL ADMIN (Excel de Pruebas)
 const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/edit?gid=0#gid=0";
 const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/preview?gid=0";
 
@@ -24,59 +17,102 @@ const App = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
 
-  // --- LOGS (TEST) ---
+  // --- LOGS ---
   const registrarLog = (documento, accion) => {
     try {
-      // Manda el log al script de pruebas con la etiqueta [TEST]
       const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: `[TEST] ${accion}` };
       fetch(URL_SCRIPT_APPS, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datosLog) }).catch(err => console.log(err));
     } catch (e) { console.error(e); }
   };
 
-  // --- CARGA ---
+  // --- CARGA DE DATOS (NUEVA LÓGICA DE COLUMNAS) ---
   useEffect(() => {
     fetch(URL_CSV).then(res => res.text()).then(csvText => {
         const filas = csvText.split(/\r?\n/);
         const diccionario = {};
+        
         filas.forEach((fila) => {
+          // Regex avanzado para separar por comas respetando comillas
           const c = fila.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-          if (c.length < 25) return;
-          const materia = c[3]?.replace(/"/g, '').trim();
-          if (!materia || materia.toUpperCase().includes("PENDIENTE")) return;
-          const nombre = c[0]?.replace(/"/g, '').trim();   
-          const id = c[1]?.replace(/"/g, '').trim();       
-          const grupo = c[5]?.replace(/"/g, '').trim();    
-          const creditos = c[7]?.replace(/"/g, '').trim(); 
-          const fInicio = c[12]?.replace(/"/g, '').trim(); 
+          
+          // Si la fila es muy corta, la saltamos
+          if (c.length < 20) return;
+
+          // --- MAPEO DE COLUMNAS NUEVO ---
+          // 6: PROFESOR, 7: DOCUMENTO, 9: ASIGNATURA, 11: GRUPO, 13: CREDITOS, 53: FECHA INICIO
+          const materia = c[9]?.replace(/"/g, '').trim();
+          if (!materia || materia.toUpperCase().includes("PENDIENTE") || materia === "ASIGNATURA") return;
+
+          const nombre = c[6]?.replace(/"/g, '').trim();   
+          const id = c[7]?.replace(/"/g, '').trim();       
+          const grupo = c[11]?.replace(/"/g, '').trim();    
+          const creditos = c[13]?.replace(/"/g, '').trim(); 
+          const fInicio = c[53]?.replace(/"/g, '').trim() || "Por definir"; 
+
           const semanas = [];
-          for (let i = 14; i <= 29; i++) { 
-            const texto = c[i]?.replace(/"/g, '').trim() || "";
-            if (texto && texto !== "-" && texto !== "0" && !texto.toLowerCase().includes("pendiente")) {
-              const zoomId = texto.match(/\d{9,11}/)?.[0];
-              const horaMatch = texto.match(/(\d{1,2}\s*A\s*\d{1,2})/i);
+          
+          // Bucle para leer las 16 semanas
+          // En el nuevo Excel, las semanas están en columnas impares empezando en la 21 (V)
+          // 21 (Sem1), 23 (Sem2), 25 (Sem3)... hasta 21 + (15*2) = 51 (Sem16)
+          for (let i = 0; i < 16; i++) { 
+            const colIndex = 21 + (i * 2);
+            const texto = c[colIndex]?.replace(/"/g, '').trim() || "";
+            
+            if (texto && texto.length > 5 && !texto.toLowerCase().includes("pendiente")) {
+              // Lógica de extracción inteligente
+              const linkMatch = texto.match(/https?:\/\/[^\s,]+/);
+              const zoomLink = linkMatch ? linkMatch[0] : null;
+              
+              const idMatch = texto.match(/ID\s*-?(\d{9,11})/i);
+              const zoomId = idMatch ? idMatch[1] : null;
+
+              const horaMatch = texto.match(/(\d{1,2}\s*[aA]\s*\d{1,2})/i); // Ej: "18 A 20"
+              
+              // La fecha suele estar al principio antes del primer guion
               const partes = texto.split('-');
-              semanas.push({ num: i - 13, fecha: partes[0] ? partes[0].trim() : "Programada", hora: horaMatch ? horaMatch[0] : (partes[1] ? partes[1].trim() : "Por definir"), zoomId: zoomId, zoomLink: zoomId ? `https://zoom.us/j/${zoomId}` : null });
+              let fechaDisplay = partes[0] || `Semana ${i+1}`;
+              
+              // Limpieza visual de la fecha (quita el año si sale "2026 /")
+              fechaDisplay = fechaDisplay.replace(/^202[0-9]\s*\/\s*/, '').replace(/\s*\/\s*/g, '/');
+
+              semanas.push({
+                num: i + 1,
+                fecha: fechaDisplay,
+                hora: horaMatch ? horaMatch[0] : "Programada",
+                zoomId: zoomId,
+                zoomLink: zoomLink
+              });
             }
           }
-          if (id && !isNaN(id)) {
-            const idLimpio = id.split('.')[0]; 
+
+          if (id && !isNaN(id.replace(/\./g, ''))) {
+            const idLimpio = id.replace(/\./g, ''); 
             if (!diccionario[idLimpio]) diccionario[idLimpio] = { nombre, idReal: idLimpio, cursos: [] };
-            if (semanas.length > 0) diccionario[idLimpio].cursos.push({ materia, grupo, creditos, fInicio, semanas });
+            if (semanas.length > 0) {
+              diccionario[idLimpio].cursos.push({ materia, grupo, creditos, fInicio, semanas });
+            }
           }
         });
         setState({ loading: false, teachers: diccionario, error: null });
-      }).catch(err => setState(s => ({ ...s, loading: false, error: "Error de conexión con la Base de Pruebas." })));
+      })
+      .catch(err => setState(s => ({ ...s, loading: false, error: "Error de conexión (Revise URL CSV)." })));
   }, []);
 
   const docente = useMemo(() => selectedId ? state.teachers[selectedId] : null, [selectedId, state.teachers]);
   const cursoActivo = docente ? docente.cursos[selectedCursoIdx] : null;
 
+  // --- HANDLERS ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
-    const encontrado = !!state.teachers[idBusqueda];
-    if (encontrado) { setSelectedId(idBusqueda); setSelectedCursoIdx(0); registrarLog(idBusqueda, '✅ Consulta Exitosa'); } 
-    else { alert("ID no encontrado en Base de Pruebas."); if (idBusqueda) registrarLog(idBusqueda, '❌ Fallido'); }
+    if (state.teachers[idBusqueda]) {
+      setSelectedId(idBusqueda);
+      setSelectedCursoIdx(0);
+      registrarLog(idBusqueda, '✅ Consulta Exitosa');
+    } else { 
+      alert("ID no encontrado en la Base de Pruebas.");
+      if (idBusqueda) registrarLog(idBusqueda, '❌ Fallido'); 
+    }
   };
 
   const handleReset = () => { setSelectedId(null); setSearchTerm(''); setSelectedCursoIdx(0); };
@@ -87,31 +123,25 @@ const App = () => {
     else alert("Contraseña incorrecta");
   };
 
+  // --- VISTAS ---
   if (view === 'admin') {
     return (
       <div style={{fontFamily:'Segoe UI', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
         <div style={{maxWidth:'1000px', width:'100%', background:'white', padding:'30px', borderRadius:'15px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)'}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:'20px'}}>
-            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-              <span style={{fontSize:'2rem'}}>📂</span>
-              <div>
-                <h2 style={{color:'#003366', margin:0}}>PANEL ADMINISTRATIVO</h2>
-                <small style={{color:'#666'}}>Modo Laboratorio 🧪</small>
-              </div>
-            </div>
+            <h2 style={{color:'#003366', margin:0}}>PANEL ADMIN (LABORATORIO)</h2>
             <div style={{display:'flex', gap:'10px'}}>
-               <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px', borderRadius:'5px', fontWeight:'bold'}}>Abrir Excel</a>
+               <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px', borderRadius:'5px'}}>Abrir Excel</a>
                <button onClick={()=>setView('user')} style={{cursor:'pointer', padding:'10px'}}>⬅ Salir</button>
             </div>
           </div>
-          {/* VISOR DE EXCEL DE PRUEBAS */}
-          <iframe src={URL_EMBED_LOGS} style={{width:'100%', height:'500px', border:'2px solid purple', borderRadius:'10px'}} title="Logs de Prueba"></iframe>
+          <iframe src={URL_EMBED_LOGS} style={{width:'100%', height:'500px', border:'2px solid purple', borderRadius:'10px'}} title="Logs"></iframe>
         </div>
       </div>
     );
   }
 
-  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando...</p></div>;
+  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando Base de Pruebas...</p></div>;
   if (state.error) return <div className="error-screen">{state.error}</div>;
 
   return (
@@ -154,8 +184,7 @@ const App = () => {
         </div>
       )}
 
-      {/* AVISO DE ENTORNO SEGURO */}
-      <div className="test-banner">⚠️ MODO LABORATORIO DE PRUEBAS</div>
+      <div className="test-banner">⚠️ MODO LABORATORIO DE PRUEBAS (Estructura Nueva)</div>
 
       <header className="header">
         <div className="header-content">
@@ -192,8 +221,9 @@ const App = () => {
               ))}
             </aside>
             <section className="dashboard">
-              <div style={{background:'var(--primary)', color:'white', padding:'15px', borderRadius:'5px 5px 0 0', marginBottom:'15px'}}>
+              <div style={{background:'var(--primary)', color:'white', padding:'15px', borderRadius:'5px 5px 0 0', marginBottom:'15px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                 <h3 style={{margin:0}}>{cursoActivo.materia}</h3>
+                <span style={{fontSize:'0.8rem', background:'rgba(255,255,255,0.2)', padding:'5px 10px', borderRadius:'20px'}}>Inicio: {cursoActivo.fInicio}</span>
               </div>
               <div className="weeks-grid">
                 {cursoActivo.semanas.map((s, idx) => (
