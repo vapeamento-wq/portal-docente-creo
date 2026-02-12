@@ -41,9 +41,11 @@ const App = () => {
           const nombre = c[6]?.replace(/"/g, '').trim();   
           let rawId = c[7]?.replace(/"/g, '').trim(); 
           const id = rawId ? rawId.split('.')[0] : null;
-          const grupo = c[11]?.replace(/"/g, '').trim();    
-          const creditos = c[13]?.replace(/"/g, '').trim(); 
-          const fInicio = c[53]?.replace(/"/g, '').trim() || "Por definir"; 
+
+          // --- MAPEO NUEVO SEGÚN TUS INSTRUCCIONES ---
+          const bloque = c[11]?.replace(/"/g, '').trim();   // Col L: Bloque
+          const fInicio = c[12]?.replace(/"/g, '').trim();  // Col M: Fecha Inicio
+          const fFin = c[13]?.replace(/"/g, '').trim();     // Col N: Fecha Fin
 
           const semanas = [];
           
@@ -53,22 +55,59 @@ const App = () => {
             
             if (texto && texto.length > 5 && !texto.startsWith("-") && !texto.toLowerCase().includes("pendiente")) {
               
-              const idMatch = texto.match(/ID\s*[-:.]?\s*(\d{9,11})/i);
-              const extractedId = idMatch ? idMatch[1] : null;
-
+              // --- 1. DETECCIÓN DE TIPO DE CLASE ---
+              let tipo = 'ZOOM';
+              let displayTexto = '';
+              let ubicacion = '';
               let finalLink = null;
-              if (extractedId) {
-                finalLink = `https://zoom.us/j/${extractedId}`;
-              } else {
-                const linkMatch = texto.match(/https?:\/\/[^\s,]+/);
-                if (linkMatch) {
-                   let cleanLink = linkMatch[0];
-                   if (cleanLink.includes("-USUARIO")) cleanLink = cleanLink.split("-USUARIO")[0];
-                   finalLink = cleanLink;
-                }
+              let zoomId = null;
+              let esTrabajoIndependiente = false;
+              
+              const textoUpper = texto.toUpperCase();
+
+              // CASO A: TRABAJO INDEPENDIENTE
+              if (textoUpper.includes("TRABAJO INDEPEN") || textoUpper.includes("TRABAJO AUTONOMO")) {
+                  tipo = 'INDEPENDIENTE';
+                  displayTexto = "Trabajo Independiente";
+                  ubicacion = "Estudio Autónomo";
+                  esTrabajoIndependiente = true;
+              } 
+              // CASO B: PRESENCIAL
+              else if (textoUpper.includes("PRESENCIAL") || textoUpper.includes("CAMPUS")) {
+                  tipo = 'PRESENCIAL';
+                  displayTexto = "Campus Principal - Presencial";
+                  ubicacion = "Sede Principal";
+                  // Intentamos buscar detalles de salón si los hay
+                  if (texto.includes("Salón") || texto.includes("Aula")) {
+                      ubicacion = texto; // O usar regex para extraer salón
+                  }
+              }
+              // CASO C: ZOOM (Standard)
+              else {
+                  // Extraer ID
+                  const idMatch = texto.match(/ID\s*[-:.]?\s*(\d{9,11})/i);
+                  zoomId = idMatch ? idMatch[1] : null;
+
+                  if (zoomId) {
+                    finalLink = `https://zoom.us/j/${zoomId}`;
+                  } else {
+                    const linkMatch = texto.match(/https?:\/\/[^\s,]+/);
+                    if (linkMatch) {
+                       let cleanLink = linkMatch[0];
+                       if (cleanLink.includes("-USUARIO")) cleanLink = cleanLink.split("-USUARIO")[0];
+                       finalLink = cleanLink;
+                    }
+                  }
               }
 
+              // --- 2. EXTRACCIÓN DE HORA ---
+              // Solo buscamos hora si NO es trabajo independiente (o si el texto trae hora explicita)
               const horaMatch = texto.match(/(\d{1,2}\s*[aA]\s*\d{1,2})/i); 
+              let horaDisplay = horaMatch ? horaMatch[0] : "Programada";
+              
+              if (esTrabajoIndependiente) horaDisplay = "Todo el día";
+
+              // --- 3. EXTRACCIÓN DE FECHA ---
               const partes = texto.split('-');
               let fechaDisplay = partes[0] || `Semana ${i+1}`;
               fechaDisplay = fechaDisplay.replace(/^202[0-9]\s*\/\s*/, '').replace(/\s*\/\s*/g, '/');
@@ -76,8 +115,11 @@ const App = () => {
               semanas.push({
                 num: i + 1,
                 fecha: fechaDisplay,
-                hora: horaMatch ? horaMatch[0] : "Programada",
-                zoomId: extractedId, 
+                hora: horaDisplay,
+                tipo: tipo,
+                displayTexto: displayTexto,
+                ubicacion: ubicacion,
+                zoomId: zoomId, 
                 zoomLink: finalLink
               });
             }
@@ -86,7 +128,7 @@ const App = () => {
           if (id && !isNaN(id)) {
              if (!diccionario[id]) diccionario[id] = { nombre, idReal: id, cursos: [] };
              if (semanas.length > 0) {
-               diccionario[id].cursos.push({ materia, grupo, creditos, fInicio, semanas });
+               diccionario[id].cursos.push({ materia, bloque, fInicio, fFin, semanas });
              }
           }
         });
@@ -153,12 +195,11 @@ const App = () => {
         :root { --primary: #003366; --secondary: #D4AF37; --orange: #FF6600; --bg: #F0F2F5; --text: #1A1A1A; --card-bg: #FFFFFF; --shadow: 0 10px 30px rgba(0,0,0,0.08); }
         body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
         
-        /* HERRAMIENTAS VISUALES */
         .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); box-shadow: var(--shadow); border-radius: 20px; }
         .rounded-btn { border-radius: 50px; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
         .rounded-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         
-        .test-banner { background: linear-gradient(90deg, #e74c3c, #c0392b); color: white; text-align: center; padding: 10px; font-weight: bold; font-size: 0.85rem; letter-spacing: 1px; box-shadow: 0 2px 10px rgba(231, 76, 60, 0.3); }
+        .test-banner { background: linear-gradient(90deg, #8e44ad, #9b59b6); color: white; text-align: center; padding: 10px; font-weight: bold; font-size: 0.85rem; letter-spacing: 1px; box-shadow: 0 2px 10px rgba(142, 68, 173, 0.3); }
         
         .header { background: var(--primary); padding: 20px 0; position: relative; overflow: hidden; }
         .header::after { content:''; position: absolute; top:-50%; right:-10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(212, 175, 55, 0.2) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; pointer-events: none; }
@@ -172,90 +213,45 @@ const App = () => {
 
         .main-content { max-width: 1200px; margin: 40px auto; padding: 0 20px; display: grid; grid-template-columns: 300px 1fr; gap: 30px; }
         
-        /* SIDEBAR (Escritorio) */
         .sidebar { padding: 30px; height: fit-content; }
         .profile-header { text-align: center; margin-bottom: 30px; }
         .avatar { width: 80px; height: 80px; background: var(--secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--primary); font-weight: bold; margin: 0 auto 15px; box-shadow: 0 10px 20px rgba(212, 175, 55, 0.3); }
         .course-btn { width: 100%; padding: 15px 20px; margin-bottom: 10px; border: none; background: transparent; text-align: left; border-radius: 15px; position: relative; transition: all 0.2s; color: #666; cursor:pointer;}
         .course-btn:hover { background: rgba(0, 51, 102, 0.05); color: var(--primary); }
         .course-btn.active { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(0, 51, 102, 0.2); }
-        .course-btn.active b { color: var(--secondary); }
         
-        /* COMPORTAMIENTO MÓVIL (CARRUSEL) */
         @media (max-width: 900px) { 
           .main-content { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; } 
-          .hero-content { flex-direction: column; text-align: center; gap: 20px; } 
-          .timeline-line { left: 19px; } 
-          .date-circle { width: 40px; height: 40px; font-size: 0.7rem; }
-          
-          /* Transformación Mágica del Sidebar a Carrusel Horizontal */
-          .sidebar { 
-            order: -1; /* Pone los cursos ARRIBA del todo */
-            padding: 15px;
-            display: flex;
-            overflow-x: auto; /* Permite scroll lateral */
-            white-space: nowrap; /* Evita que los botones bajen */
-            gap: 15px;
-            background: transparent;
-            box-shadow: none;
-            backdrop-filter: none;
-            border: none;
-            scrollbar-width: none; /* Ocultar barra scroll en Firefox */
-          }
-          .sidebar::-webkit-scrollbar { display: none; /* Ocultar barra scroll en Chrome/Safari */ }
-          
-          .profile-header { display: none; /* Ocultamos el avatar gigante en móvil para ahorrar espacio */ }
-          
-          .course-btn {
-            min-width: 200px; /* Tarjetas anchas */
-            background: white;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            margin-bottom: 0;
-            display: inline-block; /* Necesario para scroll horizontal */
-            white-space: normal; /* Permite que el texto dentro de la tarjeta sí baje */
-          }
-          .course-btn.active {
-            background: var(--primary);
-            color: white;
-            transform: scale(1.05);
-          }
+          .sidebar { order: -1; padding: 15px; display: flex; overflow-x: auto; gap: 15px; background: transparent; box-shadow: none; border: none; scrollbar-width: none; }
+          .sidebar::-webkit-scrollbar { display: none; }
+          .profile-header { display: none; }
+          .course-btn { min-width: 200px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-bottom: 0; white-space: normal; }
+          .course-btn.active { background: var(--primary); color: white; transform: scale(1.05); }
         }
 
-        /* DASHBOARD */
         .hero-card { background: linear-gradient(135deg, #003366 0%, #004080 100%); color: white; padding: 40px; border-radius: 25px; position: relative; overflow: hidden; margin-bottom: 40px; box-shadow: 0 20px 40px rgba(0, 51, 102, 0.3); }
-        .hero-card::before { content:''; position: absolute; top:0; right:0; width: 300px; height: 300px; background: url('https://www.transparenttextures.com/patterns/cube-coat.png'); opacity: 0.1; }
-        .hero-content { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; }
-        .hero-badge { background: var(--secondary); color: var(--primary); padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 15px; display: inline-block; }
+        .hero-info-grid { display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
+        .hero-info-item { background: rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 10px; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+        
         .big-btn { background: var(--secondary); color: var(--primary); text-decoration: none; padding: 15px 40px; border-radius: 50px; font-weight: 800; font-size: 1.1rem; box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform 0.2s; }
-        .big-btn:hover { transform: scale(1.05); }
-
-        /* TIMELINE */
+        
         .timeline-container { padding: 30px; background: white; border-radius: 25px; }
         .timeline-item { display: flex; gap: 20px; margin-bottom: 30px; position: relative; }
         .timeline-line { position: absolute; left: 24px; top: 50px; bottom: -30px; width: 2px; background: #eee; z-index: 0; }
         .timeline-item:last-child .timeline-line { display: none; }
-        
         .date-circle { width: 50px; height: 50px; background: #fff; border: 3px solid #eee; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; color: #aaa; z-index: 1; flex-shrink: 0; }
-        .timeline-item.active .date-circle { border-color: var(--secondary); color: var(--primary); background: #fffdf5; box-shadow: 0 0 0 5px rgba(212, 175, 55, 0.2); transform: scale(1.1); }
+        .timeline-item.active .date-circle { border-color: var(--secondary); color: var(--primary); background: #fffdf5; box-shadow: 0 0 0 5px rgba(212, 175, 55, 0.2); }
+        .timeline-content { flex: 1; background: #f9f9f9; padding: 20px; border-radius: 20px; border: 1px solid #eee; }
         
-        .timeline-content { flex: 1; background: #f9f9f9; padding: 20px; border-radius: 20px; border: 1px solid #eee; transition: all 0.2s; }
-        .timeline-item.active .timeline-content { background: white; border-color: var(--secondary); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-
-        .tag { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; margin-right: 8px; }
-        .tag-blue { background: #e3f2fd; color: #1565c0; }
-        .tag-gold { background: #fff8e1; color: #fbc02d; }
-
         .zoom-mini-btn { display: inline-flex; align-items: center; gap: 5px; background: #2D8CFF; color: white; padding: 8px 15px; border-radius: 20px; text-decoration: none; font-size: 0.85rem; font-weight: bold; margin-top: 10px; }
+        .offline-badge { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-top: 5px; }
 
-        .whatsapp-btn { position: fixed; bottom: 30px; right: 30px; background: #25D366; color: white; padding: 15px 30px; border-radius: 50px; text-decoration: none; font-weight: bold; box-shadow: 0 10px 30px rgba(37, 211, 102, 0.4); transition: transform 0.2s; z-index: 100; display: flex; align-items: center; gap: 10px; }
-        .whatsapp-btn:hover { transform: translateY(-5px); }
-
+        .whatsapp-btn { position: fixed; bottom: 30px; right: 30px; background: #25D366; color: white; padding: 15px 30px; border-radius: 50px; text-decoration: none; font-weight: bold; box-shadow: 0 10px 30px rgba(37, 211, 102, 0.4); z-index: 100; display: flex; align-items: center; gap: 10px; }
         .loading-screen, .error-screen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg); }
         .spinner { border: 4px solid rgba(0, 51, 102, 0.1); border-top: 4px solid var(--secondary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       `}</style>
       
-      {/* LOGIN ADMIN MODAL */}
       {view === 'login' && (
         <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', backdropFilter:'blur(5px)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}}>
           <form onSubmit={handleLogin} className="glass-panel" style={{padding:'40px', width:'300px', textAlign:'center'}}>
@@ -269,7 +265,7 @@ const App = () => {
         </div>
       )}
 
-      <div className="test-banner">⚠️ MODO LABORATORIO DE DISEÑO (v10.1 Mobile UX)</div>
+      <div className="test-banner">⚠️ MODO LABORATORIO v11.0 (Fechas y Bloques)</div>
 
       <header className="header">
         <div className="header-content">
@@ -294,14 +290,12 @@ const App = () => {
           <div className="glass-panel" style={{gridColumn:'1 / -1', textAlign:'center', padding:'80px 20px'}}>
             <div style={{fontSize:'4rem', marginBottom:'20px'}}>👨‍🏫</div>
             <h1 style={{color:'var(--primary)', marginBottom:'10px'}}>Bienvenido al Portal Docente</h1>
-            <p style={{color:'#666', maxWidth:'500px', margin:'0 auto'}}>
-              Gestione sus asignaturas, acceda a sus clases virtuales y consulte su programación académica en un solo lugar.
-            </p>
-            <div style={{marginTop:'60px', cursor:'pointer', opacity:0.3, fontSize:'0.8rem'}} onClick={()=>setView('login')}>🔒 Acceso Administrativo</div>
+            <p style={{color:'#666', maxWidth:'500px', margin:'0 auto'}}>Consulta de asignación académica y acceso a aulas virtuales.</p>
+            <div style={{marginTop:'60px', cursor:'pointer', opacity:0.3, fontSize:'0.8rem'}} onClick={()=>setView('login')}>🔒 Acceso Admin</div>
           </div>
         ) : (
           <>
-            {/* SIDEBAR CON PERFIL Y CURSOS */}
+            {/* SIDEBAR */}
             <aside className="sidebar glass-panel">
               <div className="profile-header">
                 <div className="avatar">{docente.nombre.charAt(0)}</div>
@@ -310,58 +304,54 @@ const App = () => {
               </div>
               
               <div className="profile-header" style={{height:'1px', background:'#eee', margin:'20px 0'}}></div>
-              
-              {/* En móvil, este título ayuda a entender que hay scroll */}
-              <div style={{color:'#aaa', fontSize:'0.75rem', letterSpacing:'1px', marginBottom:'10px', display:'none'}} className="mobile-hint">DESLIZA PARA VER MÁS 👉</div>
 
               {docente.cursos.map((c, i) => (
                 <button key={i} onClick={()=>setSelectedCursoIdx(i)} className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}>
                   <div style={{fontWeight:'bold', fontSize:'0.9rem'}}>{c.materia}</div>
-                  <div style={{fontSize:'0.75rem', marginTop:'3px', opacity:0.8}}>Grupo {c.grupo} • {c.creditos} Créditos</div>
+                  <div style={{fontSize:'0.75rem', marginTop:'3px', opacity:0.8}}>
+                    {c.bloque ? `Bloque: ${c.bloque}` : `Grupo ${c.grupo}`}
+                  </div>
                 </button>
               ))}
             </aside>
 
-            {/* CONTENIDO PRINCIPAL */}
+            {/* DASHBOARD */}
             <section className="dashboard-column">
               
-              {/* TARJETA HÉROE - PRÓXIMA CLASE */}
-              {proximaClase && (
+              {/* HERO CARD DETALLADA */}
+              {cursoActivo && (
                 <div className="hero-card">
                   <div className="hero-content">
-                    <div>
-                      <span className="hero-badge">🌟 Próxima Clase</span>
-                      <h1 style={{margin:'0 0 10px', fontSize:'2.2rem'}}>{cursoActivo.materia}</h1>
-                      <div style={{display:'flex', gap:'20px', fontSize:'1.1rem', opacity:0.9}}>
-                        <span>📅 {proximaClase.fecha}</span>
-                        <span>⏰ {proximaClase.hora}</span>
+                    <div style={{flex:1}}>
+                      <span className="hero-badge">🌟 Asignatura Actual</span>
+                      <h1 style={{margin:'0 0 10px', fontSize:'2rem', lineHeight:'1.2'}}>{cursoActivo.materia}</h1>
+                      
+                      {/* NUEVO: GRID DE INFO DEL CURSO */}
+                      <div className="hero-info-grid">
+                        <div className="hero-info-item">📅 Inicio: {cursoActivo.fInicio || 'N/A'}</div>
+                        <div className="hero-info-item">🏁 Fin: {cursoActivo.fFin || 'N/A'}</div>
+                        <div className="hero-info-item">🏫 {cursoActivo.bloque || 'Sin Bloque'}</div>
                       </div>
                     </div>
-                    <div>
-                      {proximaClase.zoomLink ? (
-                        <a href={proximaClase.zoomLink} target="_blank" rel="noreferrer" className="big-btn rounded-btn" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Hero ${proximaClase.num}`)}>
-                          <span>ENTRAR AHORA</span>
-                          <span style={{background:'rgba(0,0,0,0.1)', padding:'5px 10px', borderRadius:'20px', fontSize:'0.7rem'}}>ID: {proximaClase.zoomId || 'LINK'}</span>
-                        </a>
-                      ) : (
-                         <div style={{opacity:0.6, fontStyle:'italic'}}>Enlace pendiente</div>
-                      )}
-                    </div>
+
+                    {/* Botón de Acción Principal (Solo si hay clase hoy/próxima con Zoom) */}
+                    {proximaClase && proximaClase.zoomLink && (
+                        <div style={{marginTop:'20px'}}>
+                          <a href={proximaClase.zoomLink} target="_blank" rel="noreferrer" className="big-btn rounded-btn" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Hero ${proximaClase.num}`)}>
+                            <span>ENTRAR A CLASE</span>
+                          </a>
+                        </div>
+                    )}
                   </div>
-                  {/* BARRA DE PROGRESO */}
-                  <div style={{marginTop:'30px', background:'rgba(255,255,255,0.1)', height:'6px', borderRadius:'10px', overflow:'hidden'}}>
-                     <div style={{width:`${progresoSemestre}%`, background:'var(--secondary)', height:'100%'}}></div>
-                  </div>
-                  <div style={{textAlign:'right', fontSize:'0.7rem', marginTop:'5px', opacity:0.7}}>Progreso del Semestre</div>
                 </div>
               )}
 
-              {/* TIMELINE DE SEMANAS */}
+              {/* TIMELINE */}
               <div className="timeline-container glass-panel">
                 <h3 style={{color:'var(--primary)', borderBottom:'1px solid #eee', paddingBottom:'15px', marginTop:0}}>Cronograma de Actividades</h3>
                 
                 {cursoActivo && cursoActivo.semanas.map((s, idx) => {
-                  const isActive = idx === 0; 
+                  const isActive = idx === 0; // Lógica visual simple
                   return (
                     <div key={idx} className={`timeline-item ${isActive ? 'active' : ''}`}>
                       <div className="timeline-line"></div>
@@ -370,22 +360,26 @@ const App = () => {
                         <span style={{fontSize:'1.2rem', lineHeight:'1'}}>{s.num}</span>
                       </div>
                       <div className="timeline-content">
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-                          <div>
-                            <div style={{fontWeight:'bold', fontSize:'1.1rem', color: isActive ? 'var(--primary)' : '#444'}}>{s.fecha}</div>
-                            <div style={{color:'#666', marginBottom:'10px'}}>{s.hora}</div>
-                            
-                            {s.zoomLink && (
-                              <div>
-                                <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-mini-btn" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Sem ${s.num}`)}>
-                                  🎥 Unirse a Clase
-                                </a>
-                                {s.zoomId && <span style={{marginLeft:'10px', fontSize:'0.75rem', color:'#888', background:'#eee', padding:'2px 8px', borderRadius:'4px'}}>ID: {s.zoomId}</span>}
-                              </div>
-                            )}
-                          </div>
-                          {isActive && <span className="tag tag-gold">PRÓXIMA</span>}
-                        </div>
+                        <div style={{fontWeight:'bold', fontSize:'1.1rem', color: isActive ? 'var(--primary)' : '#444'}}>{s.fecha}</div>
+                        
+                        {/* MANEJO DE TIPOS DE CLASE */}
+                        {s.tipo === 'INDEPENDIENTE' ? (
+                            <div className="offline-badge">🏠 {s.displayTexto}</div>
+                        ) : s.tipo === 'PRESENCIAL' ? (
+                            <div className="offline-badge">🏫 {s.displayTexto}</div>
+                        ) : (
+                            <>
+                              <div style={{color:'#666', marginBottom:'5px'}}>{s.hora}</div>
+                              {s.zoomLink && (
+                                <div>
+                                  <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-mini-btn" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Sem ${s.num}`)}>
+                                    🎥 Unirse a Zoom
+                                  </a>
+                                  {s.zoomId && <span style={{marginLeft:'10px', fontSize:'0.75rem', color:'#888'}}>ID: {s.zoomId}</span>}
+                                </div>
+                              )}
+                            </>
+                        )}
                       </div>
                     </div>
                   );
