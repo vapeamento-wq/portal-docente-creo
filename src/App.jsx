@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- CONFIGURACIÓN BLINDADA ---
+// --- CONFIGURACIÓN BLINDADA (LINKS DIRECTOS) ---
 const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
 const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbxmvuy0L8BT-PzJnD98_gnyjw342BtcALKQDf1kEqhAW9G_IXWRM85kyVh786KmaMibxQ/exec";
 const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/edit?gid=0#gid=0";
@@ -23,12 +23,6 @@ const App = () => {
       const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: accion };
       fetch(URL_SCRIPT_APPS, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datosLog) }).catch(err => console.log(err));
     } catch (e) { console.error(e); }
-  };
-
-  // --- IMPRIMIR ---
-  const handlePrint = () => {
-    window.print();
-    if(docente) registrarLog(docente.idReal, '🖨️ Imprimió Horario');
   };
 
   // --- CARGA ---
@@ -77,12 +71,14 @@ const App = () => {
     else { alert("ID no encontrado."); if (idBusqueda) registrarLog(idBusqueda, '❌ Fallido'); }
   };
 
+  const handleReset = () => { setSelectedId(null); setSearchTerm(''); setSelectedCursoIdx(0); };
+
   if (view === 'admin') {
     return (
       <div style={{fontFamily:'Segoe UI', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
         <div style={{maxWidth:'1000px', width:'100%', background:'white', padding:'30px', borderRadius:'15px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)'}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:'20px'}}>
-            <h2>PANEL ADMIN</h2>
+            <h2>PANEL ADMIN (PRUEBAS)</h2>
             <button onClick={()=>setView('user')}>⬅ Salir</button>
           </div>
           <iframe src={URL_EMBED_LOGS} style={{width:'100%', height:'500px', border:'none'}} title="Logs"></iframe>
@@ -92,14 +88,15 @@ const App = () => {
     );
   }
 
-  if (state.loading) return <div className="loading-screen">Loading...</div>;
+  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando...</p></div>;
   if (state.error) return <div className="error-screen">{state.error}</div>;
 
   return (
     <div className="portal-container">
       <style>{`
-        :root { --primary: #003366; --secondary: #D4AF37; --orange: #FF6600; --bg: #f4f6f8; --text: #333; }
+        :root { --primary: #003366; --secondary: #D4AF37; --orange: #FF6600; --bg: #f4f6f8; --text: #333; --test-alert: #e74c3c; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+        .test-banner { background: var(--test-alert); color: white; text-align: center; padding: 5px; font-weight: bold; font-size: 0.8rem; }
         .header { background: var(--primary); padding: 15px 0; border-bottom: 4px solid var(--secondary); }
         .header-content { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
         .brand h1 { margin: 0; color: var(--orange); font-size: 1.5rem; } .brand h2 { color: white; font-size: 0.8rem; margin:0; }
@@ -113,24 +110,25 @@ const App = () => {
         .weeks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 20px; }
         .week-card { border: 1px solid #eee; padding: 15px; border-radius: 8px; }
         .zoom-link { display: block; background: #2D8CFF; color: white; text-align: center; padding: 8px; border-radius: 4px; text-decoration: none; margin-top: 10px; }
-        .print-btn { background: #333; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 5px; margin-left: auto; }
-        @media print {
-          .header, .sidebar, .actions, .whatsapp-btn, .zoom-link { display: none !important; }
-          .dashboard { box-shadow: none; border: none; }
-          .weeks-grid { display: block; }
-          .week-card { break-inside: avoid; border: 1px solid #ccc; margin-bottom: 10px; }
-        }
+        .whatsapp-btn { position: fixed; bottom: 25px; right: 25px; background: #25D366; color: white; padding: 12px 24px; border-radius: 50px; text-decoration: none; font-weight: bold; }
+        .loading-screen, .error-screen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--secondary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @media (min-width: 900px) { .main-content { flex-wrap: nowrap; align-items: flex-start; } .sidebar { flex-shrink: 0; } }
       `}</style>
+      
+      {/* AVISO DE QUE ESTÁS EN PRUEBAS */}
+      <div className="test-banner">🧪 ESTÁS EN EL MODO DE PRUEBAS - ESTO NO ES PÚBLICO</div>
 
       <header className="header">
         <div className="header-content">
-          <div className="brand" onClick={handleReset}>
-            <h1>PORTAL DOCENTES (MODO PRUEBAS 🧪)</h1>
+          <div className="brand" onClick={handleReset} style={{cursor:'pointer'}}>
+            <h1>PORTAL DOCENTES (LABORATORIO)</h1>
             <h2>ADMINISTRACIÓN S.S.T.</h2>
           </div>
           <div className="actions">
             {!docente && <form onSubmit={handleSearch} className="search-form"><input placeholder="Documento..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} /><button className="btn-search">BUSCAR</button></form>}
-            {docente && <button onClick={handleReset} style={{cursor:'pointer', padding:'5px'}}>Nueva Consulta ↺</button>}
+            {docente && <button onClick={handleReset} className="btn-search">Nueva Consulta ↺</button>}
           </div>
         </div>
       </header>
@@ -138,8 +136,8 @@ const App = () => {
       <main className="main-content">
         {!docente ? (
           <div style={{textAlign:'center', width:'100%', padding:'50px', background:'white', borderRadius:'10px'}}>
-            <h2>Bienvenido al Portal de Docentes</h2>
-            <p>Ingresa tu documento arriba.</p>
+            <h2>Bienvenido al Laboratorio de Pruebas</h2>
+            <p>Aquí puedes experimentar sin miedo.</p>
             <div style={{marginTop:'20px', cursor:'pointer', opacity:0.5}} onClick={()=>setView('login')}>🔒 Admin</div>
           </div>
         ) : (
@@ -155,10 +153,7 @@ const App = () => {
               ))}
             </aside>
             <section className="dashboard">
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'2px solid var(--secondary)', paddingBottom:'10px'}}>
-                <h2 style={{margin:0, color:'var(--primary)'}}>{cursoActivo.materia}</h2>
-                <button onClick={handlePrint} className="print-btn">🖨️ Imprimir / PDF</button>
-              </div>
+              <h2 style={{margin:0, color:'var(--primary)', borderBottom:'2px solid var(--secondary)', paddingBottom:'10px'}}>{cursoActivo.materia}</h2>
               <div className="weeks-grid">
                 {cursoActivo.semanas.map((s, idx) => (
                   <div key={idx} className="week-card">
@@ -172,6 +167,8 @@ const App = () => {
           </>
         )}
       </main>
+      
+      <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer" className="whatsapp-btn">💬 Mesa de Ayuda</a>
     </div>
   );
 };
