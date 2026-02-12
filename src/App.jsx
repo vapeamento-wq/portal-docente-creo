@@ -80,7 +80,7 @@ const App = () => {
     return "Buenas noches";
   };
 
-  // --- BÚSQUEDA NORMAL (Para estudiantes) ---
+  // --- BÚSQUEDA NORMAL ACTUALIZADA (Ahora registra errores) ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
@@ -97,15 +97,22 @@ const App = () => {
           const cursosProcesados = procesarCursos(data.cursos);
           setDocente({ ...data, cursos: cursosProcesados });
           setSelectedCursoIdx(0);
-          // AL ENCONTRAR, GUARDAMOS EL LOG
+          // LOG: Éxito
           registrarLog(idBusqueda, '✅ Consulta Exitosa');
         } else {
           showToast('❌ No encontrado');
+          // 🔥 NUEVO: Ahora también registramos cuando NO se encuentra el ID
+          registrarLog(idBusqueda, '❌ ID No Encontrado');
         }
       })
-      .catch(err => { setLoading(false); showToast('⚠️ Error de Red'); });
+      .catch(err => { 
+        setLoading(false); 
+        showToast('⚠️ Error de Red');
+        // Opcional: registrar error de conexión
+        registrarLog(idBusqueda, '⚠️ Error de Conexión');
+      });
   };
-
+  
   // --- BÚSQUEDA DIAGNÓSTICO (Para Admin - Sin Log) ---
   const handleAdminDiagnostico = (e) => {
     e.preventDefault();
