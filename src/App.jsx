@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 const FIREBASE_DB_URL = "https://portal-creo-db-default-rtdb.firebaseio.com/docentes/"; 
 
 // 2. ESCRITURA DE LOGS (Tu Script Nuevo - EL QUE ME ACABAS DE DAR) ✅
-const URL_SCRIPT_LOGS = "https://script.google.com/macros/s/AKfycbzME0D_wVP6l4AxLsZMFT4gIDJoD5LAlUhrQ1OL3Al1tAUZZvmiiF1VOlYmiUqY_DeL/exec";
+const URL_SCRIPT_LOGS = "https://script.google.com/macros/s/AKfycbwuwh3VKhz0u6Phsu01Dn2W561K24VPmbIjT9B8kC6k_fw8jClrZLjr6Z6HSU7daRd1/exec";
 
 // 3. ACCESO AL EXCEL MAESTRO (Tu Archivo Nuevo) ✅
 const URL_TU_EXCEL_MAESTRO = "https://docs.google.com/spreadsheets/d/1fHgj_yep0s7955EeaRpFiJeBLJX_-PLtjOFxWepoprQ/edit";
