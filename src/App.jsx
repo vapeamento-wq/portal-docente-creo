@@ -42,22 +42,20 @@ const App = () => {
           let rawId = c[7]?.replace(/"/g, '').trim(); 
           const id = rawId ? rawId.split('.')[0] : null;
 
-          // --- 📍 COORDENADAS RECALIBRADAS (v11.1) ---
-          // Bloque: Columna T (Índice 19)
+          // --- 📍 EXTRACCIÓN DE DATOS ---
+          // Grupo (Donde dice Semestre/Sede): Columna L (11)
+          const grupo = c[11]?.replace(/"/g, '').trim();
+          
+          // Bloque: Columna T (19)
           const bloqueRaw = c[19]?.replace(/"/g, '').trim(); 
           const bloque = bloqueRaw && bloqueRaw.toLowerCase().includes("bloque") ? bloqueRaw : "Bloque General";
 
-          // Fechas: Columnas BB (53) y BC (54)
-          // Vienen formato YYYY-MM-DD, las convertimos para que se vean bonitas
-          const rawInicio = c[53]?.replace(/"/g, '').trim();
-          const rawFin = c[54]?.replace(/"/g, '').trim();
-          
-          const fInicio = rawInicio || "Por definir";
-          const fFin = rawFin || "Por definir";
+          // Fechas: Col BB (53) y BC (54)
+          const fInicio = c[53]?.replace(/"/g, '').trim() || "Por definir";
+          const fFin = c[54]?.replace(/"/g, '').trim() || "Por definir";
 
           const semanas = [];
           
-          // El bucle de semanas comienza en la columna 55
           for (let i = 0; i < 16; i++) { 
             const colIndex = 55 + i; 
             const texto = c[colIndex]?.replace(/"/g, '').trim() || "";
@@ -73,7 +71,6 @@ const App = () => {
               
               const textoUpper = texto.toUpperCase();
 
-              // Lógica de Tipos de Clase
               if (textoUpper.includes("TRABAJO INDEPEN") || textoUpper.includes("TRABAJO AUTONOMO")) {
                   tipo = 'INDEPENDIENTE';
                   displayTexto = "Trabajo Independiente";
@@ -126,7 +123,8 @@ const App = () => {
           if (id && !isNaN(id)) {
              if (!diccionario[id]) diccionario[id] = { nombre, idReal: id, cursos: [] };
              if (semanas.length > 0) {
-               diccionario[id].cursos.push({ materia, bloque, fInicio, fFin, semanas });
+               // AHORA GUARDAMOS TODO: GRUPO + BLOQUE + FECHAS
+               diccionario[id].cursos.push({ materia, grupo, bloque, fInicio, fFin, semanas });
              }
           }
         });
@@ -145,7 +143,6 @@ const App = () => {
 
   const progresoSemestre = cursoActivo ? Math.min(100, Math.max(10, (cursoActivo.semanas.length / 16) * 100)) : 0;
 
-  // --- HANDLERS ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
@@ -214,16 +211,22 @@ const App = () => {
         .sidebar { padding: 30px; height: fit-content; }
         .profile-header { text-align: center; margin-bottom: 30px; }
         .avatar { width: 80px; height: 80px; background: var(--secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--primary); font-weight: bold; margin: 0 auto 15px; box-shadow: 0 10px 20px rgba(212, 175, 55, 0.3); }
+        
+        /* BOTÓN DEL CURSO (SIDEBAR) MEJORADO */
         .course-btn { width: 100%; padding: 15px 20px; margin-bottom: 10px; border: none; background: transparent; text-align: left; border-radius: 15px; position: relative; transition: all 0.2s; color: #666; cursor:pointer;}
         .course-btn:hover { background: rgba(0, 51, 102, 0.05); color: var(--primary); }
         .course-btn.active { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(0, 51, 102, 0.2); }
+        .course-btn.active .grupo-text { color: rgba(255,255,255,0.8); }
+        .course-btn.active .bloque-badge { background: var(--secondary); color: var(--primary); }
         
+        .bloque-badge { display: inline-block; font-size: 0.7rem; background: #eee; padding: 2px 8px; border-radius: 10px; margin-top: 5px; font-weight: bold; color: #555; }
+
         @media (max-width: 900px) { 
           .main-content { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; } 
           .sidebar { order: -1; padding: 15px; display: flex; overflow-x: auto; gap: 15px; background: transparent; box-shadow: none; border: none; scrollbar-width: none; }
           .sidebar::-webkit-scrollbar { display: none; }
           .profile-header { display: none; }
-          .course-btn { min-width: 200px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-bottom: 0; white-space: normal; }
+          .course-btn { min-width: 220px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-bottom: 0; white-space: normal; }
           .course-btn.active { background: var(--primary); color: white; transform: scale(1.05); }
         }
 
@@ -263,7 +266,7 @@ const App = () => {
         </div>
       )}
 
-      <div className="test-banner">⚠️ MODO LABORATORIO v11.1 (Coordenadas Exactas)</div>
+      <div className="test-banner">⚠️ MODO LABORATORIO v11.2 (Info Completa)</div>
 
       <header className="header">
         <div className="header-content">
@@ -306,7 +309,12 @@ const App = () => {
               {docente.cursos.map((c, i) => (
                 <button key={i} onClick={()=>setSelectedCursoIdx(i)} className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}>
                   <div style={{fontWeight:'bold', fontSize:'0.9rem'}}>{c.materia}</div>
-                  <div style={{fontSize:'0.75rem', marginTop:'3px', opacity:0.8}}>
+                  
+                  {/* AQUÍ ESTÁ LA CORRECCIÓN: GRUPO + BLOQUE */}
+                  <div className="grupo-text" style={{fontSize:'0.75rem', marginTop:'3px', color:'#666'}}>
+                    {c.grupo}
+                  </div>
+                  <div className="bloque-badge">
                     {c.bloque}
                   </div>
                 </button>
@@ -330,6 +338,11 @@ const App = () => {
                       
                       <h1 style={{margin:'10px 0', fontSize:'2rem', lineHeight:'1.2'}}>{cursoActivo.materia}</h1>
                       
+                      {/* SUBTÍTULO CON GRUPO */}
+                      <div style={{fontSize:'1rem', opacity:0.8, marginBottom:'20px'}}>
+                        {cursoActivo.grupo}
+                      </div>
+
                       {/* GRID DE FECHAS */}
                       <div className="hero-info-grid">
                         <div className="hero-info-item">📅 Inicio: <strong>{cursoActivo.fInicio}</strong></div>
