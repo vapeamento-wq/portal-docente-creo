@@ -271,8 +271,8 @@ const App = () => {
       <header className="header">
         <div className="header-content">
           <div className="brand" onClick={handleReset} style={{cursor:'pointer'}}>
-            <h1>PORTAL DOCENTES</h1>
-            <h2>ADMINISTRACIÓN S.S.T.</h2>
+            <h1>PORTAL DOCENTES - CREO  </h1>
+            <h2>ADMINISTRACIÓN DE LA SEGURIDA Y SALUD EN EL TRABAJO.</h2>
           </div>
           <div className="actions">
             {!docente && (
