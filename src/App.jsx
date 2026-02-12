@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
-// --- ⚡ CONFIGURACIÓN FINAL (TUS DATOS REALES) ---
+// --- ⚡ CONFIGURACIÓN MAESTRA (YA ACTUALIZADA) ---
 
-// 1. LECTURA (Firebase)
+// 1. LECTURA RÁPIDA (Firebase)
 const FIREBASE_DB_URL = "https://portal-creo-db-default-rtdb.firebaseio.com/docentes/"; 
 
-// 2. ESCRITURA DE LOGS (Tu Script Actualizado)
-const URL_SCRIPT_LOGS = "https://script.google.com/macros/s/AKfycbzTIeKc3tOnGHBO065yYEOH6wzUZeBhhiFwJlVLy2MMw-TM3zp2x9irQnpzSW_vjy0k/exec";
+// 2. ESCRITURA DE LOGS (Tu Script Nuevo - EL QUE ME ACABAS DE DAR) ✅
+const URL_SCRIPT_LOGS = "https://script.google.com/macros/s/AKfycbzME0D_wVP6l4AxLsZMFT4gIDJoD5LAlUhrQ1OL3Al1tAUZZvmiiF1VOlYmiUqY_DeL/exec";
 
-// 3. ACCESO AL EXCEL MAESTRO (Tu Archivo Nuevo - CORREGIDO ✅)
+// 3. ACCESO AL EXCEL MAESTRO (Tu Archivo Nuevo) ✅
 const URL_TU_EXCEL_MAESTRO = "https://docs.google.com/spreadsheets/d/1fHgj_yep0s7955EeaRpFiJeBLJX_-PLtjOFxWepoprQ/edit";
 
 const URL_FIREBASE_CONSOLE = "https://console.firebase.google.com/";
@@ -30,7 +30,7 @@ const App = () => {
   const [docente, setDocente] = useState(null); 
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
   
-  // Estados Admin
+  // Estados Admin (Diagnóstico)
   const [adminSearch, setAdminSearch] = useState('');
   const [adminResult, setAdminResult] = useState(null);
   
@@ -54,9 +54,11 @@ const App = () => {
     setTimeout(() => setToast({ show: false, msg: '' }), 3000);
   };
 
+  // --- FUNCIÓN QUE ENVÍA EL LOG AL SCRIPT ---
   const registrarLog = (documento, accion) => {
     try {
       const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: `[APP] ${accion}` };
+      // Usamos mode: 'no-cors' para enviar datos sin esperar respuesta (más rápido y sin error)
       fetch(URL_SCRIPT_LOGS, { 
         method: "POST", 
         mode: "no-cors", 
@@ -78,6 +80,7 @@ const App = () => {
     return "Buenas noches";
   };
 
+  // --- BÚSQUEDA NORMAL (Para estudiantes) ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
@@ -94,6 +97,7 @@ const App = () => {
           const cursosProcesados = procesarCursos(data.cursos);
           setDocente({ ...data, cursos: cursosProcesados });
           setSelectedCursoIdx(0);
+          // AL ENCONTRAR, GUARDAMOS EL LOG
           registrarLog(idBusqueda, '✅ Consulta Exitosa');
         } else {
           showToast('❌ No encontrado');
@@ -102,6 +106,7 @@ const App = () => {
       .catch(err => { setLoading(false); showToast('⚠️ Error de Red'); });
   };
 
+  // --- BÚSQUEDA DIAGNÓSTICO (Para Admin - Sin Log) ---
   const handleAdminDiagnostico = (e) => {
     e.preventDefault();
     const idBusqueda = adminSearch.replace(/\D/g, '');
@@ -111,8 +116,8 @@ const App = () => {
     fetch(`${FIREBASE_DB_URL}${idBusqueda}.json`)
       .then(res => res.json())
       .then(data => {
-        if(data) setAdminResult(`✅ ENCONTRADO:\n${data.nombre}\n(${data.cursos.length} cursos activos)`);
-        else setAdminResult(`❌ NO EXISTE EN FIREBASE.\n(Sincroniza el Excel)`);
+        if(data) setAdminResult(`✅ ENCONTRADO EN NUBE:\nNombre: ${data.nombre}\nCursos: ${data.cursos.length}`);
+        else setAdminResult(`❌ NO EXISTE EN FIREBASE.\n(Prueba sincronizar el Excel nuevamente)`);
       })
       .catch(() => setAdminResult('⚠️ Error de conexión'));
   };
@@ -186,6 +191,7 @@ const App = () => {
 
   const cursoActivo = docente && docente.cursos.length > 0 ? docente.cursos[selectedCursoIdx] : null;
 
+  // --- VISTA ADMIN (Panel de Control) ---
   if (view === 'admin') {
     return (
       <div style={{fontFamily:'Segoe UI', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
@@ -194,32 +200,38 @@ const App = () => {
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', borderBottom:'1px solid #eee', paddingBottom:'20px'}}>
             <div>
               <h2 style={{color:'#003366', margin:0}}>PANEL DE CONTROL</h2>
-              <p style={{color:'#666', margin:'5px 0 0'}}>Sistema: 🟢 Operativo</p>
+              <p style={{color:'#666', margin:'5px 0 0'}}>Sistema: 🟢 Operativo | Logs: 🟢 Activos</p>
             </div>
             <button onClick={()=>setView('user')} style={{cursor:'pointer', padding:'10px 25px', borderRadius:'30px', border:'none', background:'#f0f0f0', fontWeight:'bold', color:'#333'}}>⬅ Volver</button>
           </div>
 
           <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'30px'}}>
+            {/* 1. DIAGNÓSTICO INCÓGNITO */}
             <div style={{background:'#f5f9ff', padding:'25px', borderRadius:'20px', border:'1px solid #dbeafe'}}>
               <h3 style={{marginTop:0, color:'#1e40af'}}>🕵️‍♂️ Diagnóstico Rápido</h3>
-              <p style={{fontSize:'0.85rem', color:'#555'}}>Verifica docentes sin generar logs.</p>
+              <p style={{fontSize:'0.85rem', color:'#555'}}>Verifica si un docente existe en la nube sin generar logs.</p>
               <form onSubmit={handleAdminDiagnostico} style={{marginTop:'15px'}}>
                 <input 
-                  placeholder="Cédula..." 
+                  placeholder="Cédula a probar..." 
                   value={adminSearch}
                   onChange={e=>setAdminSearch(e.target.value)}
-                  style={{width:'100%', padding:'10px', borderRadius:'10px', border:'1px solid #ccc', marginBottom:'10px'}}
+                  style={{width:'100%', padding:'10px', borderRadius:'10px', border:'1px solid #ccc', marginBottom:'10px', boxSizing:'border-box'}}
                 />
-                <button style={{width:'100%', padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>Consultar</button>
+                <button style={{width:'100%', padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>Consultar Nube</button>
               </form>
-              {adminResult && <pre style={{background:'white', padding:'10px', marginTop:'15px', borderRadius:'10px', border:'1px solid #ddd'}}>{adminResult}</pre>}
+              {adminResult && (
+                <pre style={{background:'white', padding:'10px', borderRadius:'10px', marginTop:'15px', fontSize:'0.85rem', border:'1px solid #ddd', whiteSpace:'pre-wrap', color:'#333'}}>
+                  {adminResult}
+                </pre>
+              )}
             </div>
 
+            {/* 2. ACCESOS RÁPIDOS */}
             <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
               <h3 style={{marginTop:0, color:'#333'}}>🚀 Accesos Directos</h3>
               
               <a href={URL_TU_EXCEL_MAESTRO} target="_blank" rel="noreferrer" 
-                 style={{display:'flex', alignItems:'center', gap:'15px', padding:'20px', background:'#27ae60', color:'white', textDecoration:'none', borderRadius:'15px', fontWeight:'bold'}}>
+                 style={{display:'flex', alignItems:'center', gap:'15px', padding:'20px', background:'#27ae60', color:'white', textDecoration:'none', borderRadius:'15px', fontWeight:'bold', boxShadow:'0 5px 15px rgba(39, 174, 96, 0.3)'}}>
                  <span style={{fontSize:'1.5rem'}}>📊</span> 
                  <div>
                    <div>Abrir Excel Maestro</div>
@@ -228,11 +240,11 @@ const App = () => {
               </a>
               
               <a href={URL_FIREBASE_CONSOLE} target="_blank" rel="noreferrer" 
-                 style={{display:'flex', alignItems:'center', gap:'15px', padding:'20px', background:'#f39c12', color:'white', textDecoration:'none', borderRadius:'15px', fontWeight:'bold'}}>
+                 style={{display:'flex', alignItems:'center', gap:'15px', padding:'20px', background:'#f39c12', color:'white', textDecoration:'none', borderRadius:'15px', fontWeight:'bold', boxShadow:'0 5px 15px rgba(243, 156, 18, 0.3)'}}>
                  <span style={{fontSize:'1.5rem'}}>🔥</span>
                  <div>
                    <div>Consola Firebase</div>
-                   <div style={{fontSize:'0.7rem', opacity:0.8}}>Base de Datos</div>
+                   <div style={{fontSize:'0.7rem', opacity:0.8}}>Base de Datos en Vivo</div>
                  </div>
               </a>
             </div>
@@ -242,6 +254,7 @@ const App = () => {
     );
   }
 
+  // --- VISTA USUARIO (Estudiantes) ---
   return (
     <div className="portal-container">
       <Toast msg={toast.msg} show={toast.show} />
