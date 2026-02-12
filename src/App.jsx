@@ -25,64 +25,69 @@ const App = () => {
     } catch (e) { console.error(e); }
   };
 
-  // --- CARGA DE DATOS (LECTURA CORRECTA COLUMNAS 55-70) ---
+  // --- CARGA DE DATOS ---
   useEffect(() => {
     fetch(URL_CSV).then(res => res.text()).then(csvText => {
         const filas = csvText.split(/\r?\n/);
         const diccionario = {};
         
         filas.forEach((fila) => {
-          // Regex avanzado para CSV
           const c = fila.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-          
-          if (c.length < 60) return; // Asegurar que tenga suficientes columnas
+          if (c.length < 60) return; 
 
-          // INDICES CONFIRMADOS:
-          // 6: Nombre, 7: Documento, 9: Asignatura, 11: Grupo, 13: Créditos, 53: Inicio
           const materia = c[9]?.replace(/"/g, '').trim();
           if (!materia || materia.toUpperCase().includes("PENDIENTE") || materia === "ASIGNATURA") return;
 
           const nombre = c[6]?.replace(/"/g, '').trim();   
           let rawId = c[7]?.replace(/"/g, '').trim(); 
-          // Limpiar ID (quitar .0 si viene como decimal)
           const id = rawId ? rawId.split('.')[0] : null;
-
           const grupo = c[11]?.replace(/"/g, '').trim();    
           const creditos = c[13]?.replace(/"/g, '').trim(); 
           const fInicio = c[53]?.replace(/"/g, '').trim() || "Por definir"; 
 
           const semanas = [];
           
-          // --- BUCLE CORREGIDO: COLUMNAS 55 A 70 ---
           for (let i = 0; i < 16; i++) { 
-            const colIndex = 55 + i; // 55 es Semana 1, 56 es Semana 2...
+            const colIndex = 55 + i; 
             const texto = c[colIndex]?.replace(/"/g, '').trim() || "";
             
-            // Filtramos celdas vacías o con guiones
             if (texto && texto.length > 5 && !texto.startsWith("-") && !texto.toLowerCase().includes("pendiente")) {
               
-              // Extracción inteligente
-              const linkMatch = texto.match(/https?:\/\/[^\s,]+/);
-              const zoomLink = linkMatch ? linkMatch[0] : null;
-              
-              const idMatch = texto.match(/ID\s*-?(\d{9,11})/i);
-              const zoomId = idMatch ? idMatch[1] : null;
+              // --- 1. EXTRACCIÓN DEL ID (PRIORIDAD MÁXIMA) ---
+              // Busca "ID -609..." o "ID 609..." o "ID: 609..."
+              const idMatch = texto.match(/ID\s*[-:.]?\s*(\d{9,11})/i);
+              const extractedId = idMatch ? idMatch[1] : null;
 
-              const horaMatch = texto.match(/(\d{1,2}\s*[aA]\s*\d{1,2})/i); // Ej: "18 A 20"
+              // --- 2. CONSTRUCCIÓN DEL LINK ---
+              let finalLink = null;
               
-              // Limpieza de Fecha (lo que está antes del primer guion)
+              if (extractedId) {
+                // OPCIÓN A: Si tenemos ID, construimos el link estándar de Zoom (EL MÁS SEGURO)
+                finalLink = `https://zoom.us/j/${extractedId}`;
+              } else {
+                // OPCIÓN B: Solo si NO hay ID, intentamos rescatar el link del texto
+                // Cortamos el link si encontramos un guion "-" después (ej: zoom.us/j/123-USUARIO)
+                const linkMatch = texto.match(/https?:\/\/[^\s,]+/);
+                if (linkMatch) {
+                   let cleanLink = linkMatch[0];
+                   // Limpieza extra: si el link tiene un guion pegado al final con texto, lo cortamos
+                   if (cleanLink.includes("-USUARIO")) cleanLink = cleanLink.split("-USUARIO")[0];
+                   finalLink = cleanLink;
+                }
+              }
+
+              // Extracción de Hora y Fecha
+              const horaMatch = texto.match(/(\d{1,2}\s*[aA]\s*\d{1,2})/i); 
               const partes = texto.split('-');
               let fechaDisplay = partes[0] || `Semana ${i+1}`;
-              
-              // Quitar "2026 / " para que se vea más limpio
               fechaDisplay = fechaDisplay.replace(/^202[0-9]\s*\/\s*/, '').replace(/\s*\/\s*/g, '/');
 
               semanas.push({
                 num: i + 1,
                 fecha: fechaDisplay,
                 hora: horaMatch ? horaMatch[0] : "Programada",
-                zoomId: zoomId,
-                zoomLink: zoomLink
+                zoomId: extractedId, // Guardamos el ID para mostrarlo
+                zoomLink: finalLink
               });
             }
           }
@@ -100,28 +105,19 @@ const App = () => {
   }, []);
 
   const docente = useMemo(() => selectedId ? state.teachers[selectedId] : null, [selectedId, state.teachers]);
-  
-  // PROTECCIÓN CONTRA PANTALLA BLANCA
-  // Si el docente existe pero no tiene cursos (raro, pero posible), evitamos el crash
   const cursoActivo = docente && docente.cursos.length > 0 ? docente.cursos[selectedCursoIdx] : null;
 
   // --- HANDLERS ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
-    
-    // Verificamos si existe Y si tiene cursos
     if (state.teachers[idBusqueda] && state.teachers[idBusqueda].cursos.length > 0) {
       setSelectedId(idBusqueda);
       setSelectedCursoIdx(0);
       registrarLog(idBusqueda, '✅ Consulta Exitosa');
     } else { 
-      // Si existe el ID pero no tiene cursos cargados
-      if(state.teachers[idBusqueda]) {
-         alert("Docente encontrado pero SIN asignación académica visible.");
-      } else {
-         alert("ID no encontrado en la Base de Pruebas.");
-      }
+      if(state.teachers[idBusqueda]) alert("Docente encontrado pero SIN asignación académica visible.");
+      else alert("ID no encontrado en la Base de Pruebas.");
       if (idBusqueda) registrarLog(idBusqueda, '❌ Fallido'); 
     }
   };
@@ -173,8 +169,10 @@ const App = () => {
         .course-btn { display: block; width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #eee; cursor: pointer; background: white; text-align: left; }
         .course-btn.active { border-left: 5px solid var(--secondary); background: #fffdf5; }
         .weeks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 20px; }
-        .week-card { border: 1px solid #eee; padding: 15px; border-radius: 8px; }
-        .zoom-link { display: block; background: #2D8CFF; color: white; text-align: center; padding: 8px; border-radius: 4px; text-decoration: none; margin-top: 10px; }
+        .week-card { border: 1px solid #eee; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; }
+        .zoom-link { display: block; background: #2D8CFF; color: white; text-align: center; padding: 10px; border-radius: 4px; text-decoration: none; margin-top: 10px; font-weight: bold; transition: background 0.2s; }
+        .zoom-link:hover { background: #1a73e8; }
+        .id-badge { font-size: 0.75rem; color: #666; text-align: center; margin-top: 5px; background: #f0f0f0; padding: 2px 5px; borderRadius: 4px; display: inline-block; align-self: center; }
         .whatsapp-btn { position: fixed; bottom: 25px; right: 25px; background: #25D366; color: white; padding: 12px 24px; border-radius: 50px; text-decoration: none; font-weight: bold; }
         .loading-screen, .error-screen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--secondary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
@@ -195,7 +193,7 @@ const App = () => {
         </div>
       )}
 
-      <div className="test-banner">⚠️ MODO LABORATORIO DE PRUEBAS (Estructura Nueva)</div>
+      <div className="test-banner">⚠️ MODO LABORATORIO DE PRUEBAS (Corrección IDs)</div>
 
       <header className="header">
         <div className="header-content">
@@ -241,10 +239,20 @@ const App = () => {
                   <div className="weeks-grid">
                     {cursoActivo.semanas.map((s, idx) => (
                       <div key={idx} className="week-card">
-                        <strong style={{color:'var(--secondary)', fontSize:'0.8rem'}}>SEMANA {s.num}</strong>
-                        <div style={{margin:'5px 0', fontWeight:'bold'}}>{s.fecha}</div>
-                        <div style={{fontSize:'0.9rem', color:'#666', marginBottom:'10px'}}>{s.hora}</div>
-                        {s.zoomLink && <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-link" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Sem ${s.num}`)}>ENTRAR A CLASE</a>}
+                        <div>
+                            <strong style={{color:'var(--secondary)', fontSize:'0.8rem'}}>SEMANA {s.num}</strong>
+                            <div style={{margin:'5px 0', fontWeight:'bold'}}>{s.fecha}</div>
+                            <div style={{fontSize:'0.9rem', color:'#666'}}>{s.hora}</div>
+                        </div>
+                        
+                        {s.zoomLink && (
+                            <div style={{textAlign:'center', marginTop:'10px'}}>
+                                <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-link" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Sem ${s.num}`)}>
+                                    ENTRAR A CLASE
+                                </a>
+                                {s.zoomId && <span className="id-badge">ID: {s.zoomId}</span>}
+                            </div>
+                        )}
                       </div>
                     ))}
                   </div>
