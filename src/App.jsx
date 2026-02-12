@@ -40,7 +40,6 @@ const App = () => {
     const opcionesFecha = { weekday: 'long', day: 'numeric', month: 'long' };
     const fecha = fechaActual.toLocaleDateString('es-CO', opcionesFecha);
     const hora = fechaActual.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
-    // Capitalizar primera letra
     return {
         fecha: fecha.charAt(0).toUpperCase() + fecha.slice(1),
         hora: hora
@@ -112,6 +111,7 @@ const App = () => {
               
               const textoUpper = texto.toUpperCase();
 
+              // Lógica de tipos
               if (textoUpper.includes("TRABAJO INDEPEN") || textoUpper.includes("TRABAJO AUTONOMO")) {
                   tipo = 'INDEPENDIENTE';
                   displayTexto = "Trabajo Independiente";
@@ -125,6 +125,7 @@ const App = () => {
                   if (texto.includes("Salón") || texto.includes("Aula")) ubicacion = texto;
               }
               else {
+                  // Zoom logic...
                   const idMatch = texto.match(/ID\s*[-:.]?\s*(\d{9,11})/i);
                   zoomId = idMatch ? idMatch[1] : null;
 
@@ -140,6 +141,7 @@ const App = () => {
                   }
               }
 
+              // --- EXTRACCIÓN MEJORADA DE HORA ---
               const horaMatch = texto.match(/(\d{1,2}\s*[aA]\s*\d{1,2})/i); 
               let horaDisplay = horaMatch ? horaMatch[0] : "Programada";
               if (esTrabajoIndependiente) horaDisplay = "Todo el día";
@@ -288,14 +290,11 @@ const App = () => {
         .hero-info-grid { display: flex; gap: 20px; margin-top: 25px; flex-wrap: wrap; background: rgba(0,0,0,0.25); padding: 15px 20px; border-radius: 15px; backdrop-filter: blur(5px); }
         .hero-info-item { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.95rem; color: rgba(255,255,255,0.9); }
         
-        .big-btn { background: var(--secondary); color: var(--primary); text-decoration: none; padding: 15px 40px; border-radius: 50px; font-weight: 800; font-size: 1.1rem; box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform 0.2s; }
-        
         .timeline-container { padding: 40px; background: white; border-radius: 30px; animation: fadeInUp 0.7s ease-out; }
         .timeline-item { display: flex; gap: 25px; margin-bottom: 30px; position: relative; }
         .timeline-line { position: absolute; left: 24px; top: 50px; bottom: -30px; width: 3px; background: #f0f0f0; z-index: 0; }
         .timeline-item:last-child .timeline-line { display: none; }
         .date-circle { width: 50px; height: 50px; background: #fff; border: 3px solid #eee; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; color: #aaa; z-index: 1; flex-shrink: 0; transition: all 0.3s; }
-        .date-circle.active { border-color: var(--secondary); color: var(--primary); background: #fffdf5; box-shadow: 0 0 0 6px rgba(212, 175, 55, 0.15); transform: scale(1.1); }
         
         .timeline-content { flex: 1; background: #fcfcfc; padding: 25px; border-radius: 20px; border: 1px solid #f0f0f0; transition: all 0.3s; }
         .timeline-content:hover { background: white; border-color: var(--secondary); box-shadow: 0 15px 30px rgba(0,0,0,0.06); transform: translateX(5px); }
@@ -306,7 +305,7 @@ const App = () => {
         .copy-icon { cursor: pointer; opacity: 0.6; transition: opacity 0.2s; font-size: 1.1rem; }
         .copy-icon:hover { opacity: 1; transform: scale(1.1); }
 
-        .offline-badge { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 8px 15px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; margin-top: 10px; border: 1px solid rgba(21, 101, 192, 0.1); }
+        .offline-badge { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 10px 20px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; margin-top: 10px; border: 1px solid rgba(21, 101, 192, 0.1); width: fit-content; }
 
         .whatsapp-btn { position: fixed; bottom: 30px; right: 30px; background: #25D366; color: white; padding: 15px 25px; border-radius: 50px; text-decoration: none; font-weight: bold; box-shadow: 0 10px 30px rgba(37, 211, 102, 0.4); z-index: 100; display: flex; align-items: center; gap: 10px; transition: transform 0.2s; }
         .whatsapp-btn:hover { transform: translateY(-5px); }
@@ -331,7 +330,7 @@ const App = () => {
         </div>
       )}
 
-      <div className="test-banner">💎 EDICIÓN PREMIUM v13.0 (Reloj en Vivo + Limpieza)</div>
+      <div className="test-banner">💎 EDICIÓN PREMIUM v13.1 (Corrección Presencial)</div>
 
       <header className="header">
         <div className="header-content">
@@ -462,6 +461,7 @@ const App = () => {
                         ) : s.tipo === 'PRESENCIAL' ? (
                             <div className="offline-badge">
                               🏫 {s.displayTexto} <br/>
+                              <div style={{marginTop:'5px', fontSize:'0.9rem', color:'#1565c0'}}>⏰ {s.hora}</div>
                               <small style={{fontWeight:'normal', opacity:0.8}}>{s.ubicacion}</small>
                             </div>
                         ) : (
