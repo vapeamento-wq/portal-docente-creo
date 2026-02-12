@@ -236,7 +236,7 @@ const App = () => {
       <header className="header">
         <div className="header-content">
           <div className="brand" onClick={handleReset} style={{cursor: 'pointer'}}>
-            <h1>PORTAL DOCENTES CREO</h1>
+            <h1>PORTAL DE PRUEBA</h1>
             <h2>ADMINISTRACIÓN DE LA SEGURIDAD Y SALUD EN EL TRABAJO</h2>
           </div>
           <div className="actions">
