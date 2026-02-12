@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- CONFIGURACIÓN BLINDADA (LINKS DIRECTOS) ---
-const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx9XNRqhtDX7dlkfBTeMWPoZPwG3LW0rn3JT_XssQUu0vz1llFjNlx1lKr6krkJt-lbVryTzn8Dpyn/pub?gid=1271152041&single=true&output=csv";
+// --- CONFIGURACIÓN DE LABORATORIO 🧪 ---
+
+// 1. NUEVA BASE DE DATOS (COPIA DE PRUEBAS)
+const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQqVxPhQsuX9SKXsPSj9P5iaL__B0eAt7jzVj8HMnxKW6QTkD6IUuS9eFYTwYep2G6x2rn8uKlfnvsO/pub?output=csv";
+
+// 2. CONECTORES (Estos siguen siendo los mismos para que funcione el sistema)
 const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbxmvuy0L8BT-PzJnD98_gnyjw342BtcALKQDf1kEqhAW9G_IXWRM85kyVh786KmaMibxQ/exec";
 const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/edit?gid=0#gid=0";
 const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/preview?gid=0";
@@ -20,7 +24,8 @@ const App = () => {
   // --- LOGS ---
   const registrarLog = (documento, accion) => {
     try {
-      const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: accion };
+      // Agregamos la marca [TEST] para que sepas en el Excel cuáles son pruebas
+      const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: `[TEST] ${accion}` };
       fetch(URL_SCRIPT_APPS, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datosLog) }).catch(err => console.log(err));
     } catch (e) { console.error(e); }
   };
@@ -57,7 +62,7 @@ const App = () => {
           }
         });
         setState({ loading: false, teachers: diccionario, error: null });
-      }).catch(err => setState(s => ({ ...s, loading: false, error: "Error de conexión." })));
+      }).catch(err => setState(s => ({ ...s, loading: false, error: "Error de conexión con la Base de Datos de Prueba." })));
   }, []);
 
   const docente = useMemo(() => selectedId ? state.teachers[selectedId] : null, [selectedId, state.teachers]);
@@ -68,7 +73,7 @@ const App = () => {
     const idBusqueda = searchTerm.replace(/\D/g, '');
     const encontrado = !!state.teachers[idBusqueda];
     if (encontrado) { setSelectedId(idBusqueda); setSelectedCursoIdx(0); registrarLog(idBusqueda, '✅ Consulta Exitosa'); } 
-    else { alert("ID no encontrado."); if (idBusqueda) registrarLog(idBusqueda, '❌ Fallido'); }
+    else { alert("ID no encontrado en la Base de Pruebas."); if (idBusqueda) registrarLog(idBusqueda, '❌ Fallido'); }
   };
 
   const handleReset = () => { setSelectedId(null); setSearchTerm(''); setSelectedCursoIdx(0); };
@@ -78,7 +83,7 @@ const App = () => {
       <div style={{fontFamily:'Segoe UI', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
         <div style={{maxWidth:'1000px', width:'100%', background:'white', padding:'30px', borderRadius:'15px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)'}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:'20px'}}>
-            <h2>PANEL ADMIN (PRUEBAS)</h2>
+            <h2>PANEL ADMIN (LABORATORIO)</h2>
             <button onClick={()=>setView('user')}>⬅ Salir</button>
           </div>
           <iframe src={URL_EMBED_LOGS} style={{width:'100%', height:'500px', border:'none'}} title="Logs"></iframe>
@@ -88,15 +93,15 @@ const App = () => {
     );
   }
 
-  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando...</p></div>;
+  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando Base de Pruebas...</p></div>;
   if (state.error) return <div className="error-screen">{state.error}</div>;
 
   return (
     <div className="portal-container">
       <style>{`
-        :root { --primary: #003366; --secondary: #D4AF37; --orange: #FF6600; --bg: #f4f6f8; --text: #333; --test-alert: #e74c3c; }
+        :root { --primary: #003366; --secondary: #D4AF37; --orange: #FF6600; --bg: #f4f6f8; --text: #333; --test-alert: #8e44ad; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
-        .test-banner { background: var(--test-alert); color: white; text-align: center; padding: 5px; font-weight: bold; font-size: 0.8rem; }
+        .test-banner { background: var(--test-alert); color: white; text-align: center; padding: 8px; font-weight: bold; font-size: 0.9rem; letter-spacing: 1px; }
         .header { background: var(--primary); padding: 15px 0; border-bottom: 4px solid var(--secondary); }
         .header-content { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
         .brand h1 { margin: 0; color: var(--orange); font-size: 1.5rem; } .brand h2 { color: white; font-size: 0.8rem; margin:0; }
@@ -117,8 +122,8 @@ const App = () => {
         @media (min-width: 900px) { .main-content { flex-wrap: nowrap; align-items: flex-start; } .sidebar { flex-shrink: 0; } }
       `}</style>
       
-      {/* AVISO DE QUE ESTÁS EN PRUEBAS */}
-      <div className="test-banner">🧪 ESTÁS EN EL MODO DE PRUEBAS - ESTO NO ES PÚBLICO</div>
+      {/* AVISO DE BASE DE DATOS DE PRUEBA */}
+      <div className="test-banner">🧪 ESTÁS USANDO LA BASE DE DATOS DE PRUEBA (NO AFECTA OFICIAL)</div>
 
       <header className="header">
         <div className="header-content">
@@ -136,8 +141,8 @@ const App = () => {
       <main className="main-content">
         {!docente ? (
           <div style={{textAlign:'center', width:'100%', padding:'50px', background:'white', borderRadius:'10px'}}>
-            <h2>Bienvenido al Laboratorio de Pruebas</h2>
-            <p>Aquí puedes experimentar sin miedo.</p>
+            <h2>Bienvenido al Laboratorio</h2>
+            <p>Ingresa un documento que exista en tu EXCEL DE PRUEBAS.</p>
             <div style={{marginTop:'20px', cursor:'pointer', opacity:0.5}} onClick={()=>setView('login')}>🔒 Admin</div>
           </div>
         ) : (
