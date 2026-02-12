@@ -267,7 +267,7 @@ const App = () => {
     <div className="portal-container">
       <Toast msg={toast.msg} show={toast.show} />
       <style>{`
-        :root { --primary: #003366; --secondary: #D4AF37; --bg: #F0F2F5; --text: #1A1A1A; }
+        :root { --primary: #003366; --secondary: #db9b32; --bg: #F0F2F5; --text: #1A1A1A; }
         body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
         
         .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
@@ -340,7 +340,7 @@ const App = () => {
         <div className="header-content">
           <div className="brand" onClick={handleReset} style={{cursor:'pointer'}}>
             <h1>PORTAL DOCENTES</h1>
-            <h2>ADMINISTRACIÓN S.S.T.</h2>
+            <h2>PROGRAMA DE ADMINISTRACIÓN DE LA SEGURIDAD Y SALUD EN EL TRABAJO </h2>
           </div>
           <div className="actions">
             {!docente && (
