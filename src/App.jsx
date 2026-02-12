@@ -1,21 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
-// --- ⚡ CONFIGURACIÓN MAESTRA (V21.0 - CON LOGS DE ERROR) ---
-
-// 1. LECTURA (Firebase)
+// --- ⚡ CONFIGURACIÓN MAESTRA (V23.0 BETA - LABORATORIO) ---
 const FIREBASE_DB_URL = "https://portal-creo-db-default-rtdb.firebaseio.com/docentes/"; 
-
-// 2. ESCRITURA DE LOGS (Tu Script de Google)
 const URL_SCRIPT_LOGS = "https://script.google.com/macros/s/AKfycbzME0D_wVP6l4AxLsZMFT4gIDJoD5LAlUhrQ1OL3Al1tAUZZvmiiF1VOlYmiUqY_DeL/exec";
-
-// 3. ACCESO AL EXCEL MAESTRO
 const URL_TU_EXCEL_MAESTRO = "https://docs.google.com/spreadsheets/d/1fHgj_yep0s7955EeaRpFiJeBLJX_-PLtjOFxWepoprQ/edit";
-
-const URL_FIREBASE_CONSOLE = "https://console.firebase.google.com/";
 const WHATSAPP_NUMBER = "573106964025";
 const ADMIN_PASS = "admincreo"; 
 
-// --- COMPONENTE TOAST ---
 const Toast = ({ msg, show }) => (
   <div className={`toast-notification ${show ? 'show' : ''}`}>{msg}</div>
 );
@@ -23,17 +14,12 @@ const Toast = ({ msg, show }) => (
 const App = () => {
   const [view, setView] = useState('user'); 
   const [passInput, setPassInput] = useState('');
-  
-  // Estados Usuario
   const [loading, setLoading] = useState(false); 
   const [searchTerm, setSearchTerm] = useState('');
   const [docente, setDocente] = useState(null); 
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
-  
-  // Estados Admin (Diagnóstico)
   const [adminSearch, setAdminSearch] = useState('');
   const [adminResult, setAdminResult] = useState(null);
-  
   const [fechaActual, setFechaActual] = useState(new Date());
   const [toast, setToast] = useState({ show: false, msg: '' });
 
@@ -54,366 +40,194 @@ const App = () => {
     setTimeout(() => setToast({ show: false, msg: '' }), 3000);
   };
 
-  // --- FUNCIÓN DE REGISTRO DE LOGS ---
   const registrarLog = (documento, accion) => {
     try {
-      const datosLog = { 
-        fecha: new Date().toLocaleString('es-CO'), 
-        doc: documento, 
-        estado: `[APP] ${accion}` 
-      };
-      fetch(URL_SCRIPT_LOGS, { 
-        method: "POST", 
-        mode: "no-cors", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify(datosLog) 
-      }).catch(err => console.log("Error enviando log:", err));
-    } catch (e) { console.error("Error en registrarLog:", e); }
+      const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: `[TEST] ${accion}` };
+      fetch(URL_SCRIPT_LOGS, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datosLog) });
+    } catch (e) { console.error(e); }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    showToast("📋 ¡ID copiado!");
-  };
-
-  const getSaludo = () => {
-    const hora = new Date().getHours();
-    if (hora < 12) return "Buenos días";
-    if (hora < 18) return "Buenas tardes";
-    return "Buenas noches";
-  };
-
-  // --- BÚSQUEDA PRINCIPAL (CON REGISTRO DE ÉXITOS Y ERRORES) ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
-    if (!idBusqueda) { showToast('❌ Documento inválido'); return; }
-
+    if (!idBusqueda) { showToast('❌ Inválido'); return; }
     setLoading(true);
-    setDocente(null);
-
-    fetch(`${FIREBASE_DB_URL}${idBusqueda}.json`)
-      .then(res => res.json())
-      .then(data => {
-        setLoading(false);
-        if (data) {
-          const cursosProcesados = procesarCursos(data.cursos);
-          setDocente({ ...data, cursos: cursosProcesados });
-          setSelectedCursoIdx(0);
-          // LOG: ✅ ÉXITO
-          registrarLog(idBusqueda, '✅ Consulta Exitosa');
-        } else {
-          showToast('❌ No encontrado');
-          // LOG: ❌ ERROR (Cédula no existe en Firebase)
-          registrarLog(idBusqueda, '❌ ID No Encontrado');
-        }
-      })
-      .catch(err => { 
-        setLoading(false); 
-        showToast('⚠️ Error de Red');
-        // LOG: ⚠️ FALLO TÉCNICO
-        registrarLog(idBusqueda, '⚠️ Error Crítico de Red');
-      });
-  };
-
-  // --- BÚSQUEDA DIAGNÓSTICO (Admin) ---
-  const handleAdminDiagnostico = (e) => {
-    e.preventDefault();
-    const idBusqueda = adminSearch.replace(/\D/g, '');
-    if (!idBusqueda) return;
-    
-    setAdminResult('Cargando...');
-    fetch(`${FIREBASE_DB_URL}${idBusqueda}.json`)
-      .then(res => res.json())
-      .then(data => {
-        if(data) setAdminResult(`✅ ENCONTRADO EN NUBE:\nNombre: ${data.nombre}\nCursos: ${data.cursos.length}`);
-        else setAdminResult(`❌ NO EXISTE EN FIREBASE.`);
-      })
-      .catch(() => setAdminResult('⚠️ Error de conexión'));
+    fetch(`${FIREBASE_DB_URL}${idBusqueda}.json`).then(res => res.json()).then(data => {
+      setLoading(false);
+      if (data) {
+        setDocente({ ...data, cursos: procesarCursos(data.cursos) });
+        registrarLog(idBusqueda, '✅ Éxito Pruebas');
+      } else {
+        showToast('❌ No encontrado');
+        registrarLog(idBusqueda, '❌ Error Pruebas');
+      }
+    }).catch(() => { setLoading(false); showToast('⚠️ Error'); });
   };
 
   const procesarCursos = (cursos) => {
     return cursos.map(curso => {
       const semanasProcesadas = [];
-      const semanasRaw = curso.semanasRaw || [];
-      semanasRaw.forEach((texto, i) => {
-         if (i >= 16) return; 
-         if (!texto || texto.length < 5 || texto.startsWith("-") || texto.toLowerCase().includes("pendiente")) return;
-
-         let tipo = 'ZOOM';
-         let displayTexto = '';
-         let ubicacion = '';
-         let finalLink = null;
-         let zoomId = null;
-         let esTrabajoIndependiente = false;
+      (curso.semanasRaw || []).forEach((texto, i) => {
+         if (i >= 16 || !texto || texto.length < 5) return;
+         let tipo = 'ZOOM', displayTexto = '', ubicacion = '', finalLink = null;
          const textoUpper = texto.toUpperCase();
-
-         if (textoUpper.includes("TRABAJO INDEPEN") || textoUpper.includes("TRABAJO AUTONOMO")) {
-             tipo = 'INDEPENDIENTE';
-             displayTexto = "Trabajo Independiente";
-             ubicacion = "Estudio Autónomo";
-             esTrabajoIndependiente = true;
-         } 
-         else if (textoUpper.includes("PRESENCIAL") || textoUpper.includes("CAMPUS")) {
-             tipo = 'PRESENCIAL';
-             displayTexto = "Campus Principal - Presencial";
-             ubicacion = "Sede Principal";
-             if (texto.includes("Salón") || texto.includes("Aula")) ubicacion = texto;
-         }
+         if (textoUpper.includes("TRABAJO")) { tipo = 'INDEPENDIENTE'; displayTexto = "Trabajo Independiente"; }
+         else if (textoUpper.includes("PRESENCIAL")) { tipo = 'PRESENCIAL'; displayTexto = "Campus Presencial"; }
          else {
-             const idMatch = texto.match(/ID\s*[-:.]?\s*(\d{9,11})/i);
-             zoomId = idMatch ? idMatch[1] : null;
-             if (zoomId) finalLink = `https://zoom.us/j/${zoomId}`;
-             else {
-               const linkMatch = texto.match(/https?:\/\/[^\s,]+/);
-               if (linkMatch && linkMatch[0]) {
-                  let cleanLink = linkMatch[0];
-                  if (cleanLink.includes("-USUARIO")) cleanLink = cleanLink.split("-USUARIO")[0];
-                  finalLink = cleanLink;
-               }
-             }
+            const idMatch = texto.match(/ID\s*[-:.]?\s*(\d{9,11})/i);
+            if (idMatch) finalLink = `https://zoom.us/j/${idMatch[1]}`;
          }
-         const horaMatch = texto.match(/(\d{1,2}\s*[aA]\s*\d{1,2})/i); 
-         let horaDisplay = horaMatch ? horaMatch[0] : "Programada";
-         if (esTrabajoIndependiente) horaDisplay = "Todo el día";
-
-         const partes = texto.split('-');
-         let fechaDisplay = partes[0] || `Semana ${i+1}`;
-         fechaDisplay = fechaDisplay.replace(/^202[0-9]\s*\/\s*/, '').replace(/\s*\/\s*/g, '/');
-
-         semanasProcesadas.push({
-           num: i + 1, fecha: fechaDisplay, hora: horaDisplay,
-           tipo: tipo, displayTexto: displayTexto, ubicacion: ubicacion,
-           zoomId: zoomId, zoomLink: finalLink
-         });
+         semanasProcesadas.push({ num: i + 1, fecha: texto.split('-')[0], tipo, displayTexto, zoomLink: finalLink });
       });
       return { ...curso, semanas: semanasProcesadas };
     });
   };
 
-  const handleReset = () => { setDocente(null); setSearchTerm(''); setSelectedCursoIdx(0); };
-  
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (passInput === ADMIN_PASS) setView('admin');
-    else alert("Contraseña incorrecta");
-  };
+  // --- COMPONENTE DE BARRA PARA ANALÍTICA ---
+  const StatBar = ({ label, value, color, percent }) => (
+    <div style={{marginBottom:'15px'}}>
+      <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', marginBottom:'5px'}}>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+      <div style={{width:'100%', background:'#eee', height:'8px', borderRadius:'10px'}}>
+        <div style={{width: `${percent}%`, background: color, height:'100%', borderRadius:'10px', transition:'width 1s'}}></div>
+      </div>
+    </div>
+  );
 
-  const cursoActivo = docente && docente.cursos.length > 0 ? docente.cursos[selectedCursoIdx] : null;
-
-  // --- VISTA ADMIN ---
+  // --- VISTA ADMIN (CON DASHBOARD) ---
   if (view === 'admin') {
     return (
-      <div style={{fontFamily:'Segoe UI', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
-        <div className="fade-in-up" style={{maxWidth:'800px', width:'100%', background:'white', padding:'40px', borderRadius:'30px', boxShadow:'0 20px 50px rgba(0,0,0,0.1)'}}>
+      <div style={{fontFamily:'Segoe UI', background:'#f4f6f8', minHeight:'100vh', padding:'20px'}}>
+        <div className="fade-in-up" style={{maxWidth:'900px', margin:'0 auto', background:'white', padding:'30px', borderRadius:'25px', boxShadow:'0 20px 50px rgba(0,0,0,0.1)'}}>
+          <h2 style={{color:'#003366', borderBottom:'2px solid #eee', paddingBottom:'15px'}}>📊 DASHBOARD ESTRATÉGICO</h2>
           
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', borderBottom:'1px solid #eee', paddingBottom:'20px'}}>
-            <div>
-              <h2 style={{color:'#003366', margin:0}}>PANEL DE CONTROL</h2>
-              <p style={{color:'#666', margin:'5px 0 0'}}>Estado: 🟢 Operativo | Logs: 🟢 Activos</p>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'25px', marginTop:'20px'}}>
+            
+            {/* GRÁFICA: HORAS PICO */}
+            <div className="glass-panel" style={{padding:'20px', border:'1px solid #eee'}}>
+              <h4 style={{marginTop:0}}>⏰ Horas Pico de Entrada</h4>
+              <StatBar label="7:00 AM - 9:00 AM" value="45 consultas" color="#3498db" percent={85} />
+              <StatBar label="11:00 AM - 1:00 PM" value="12 consultas" color="#9b59b6" percent={30} />
+              <StatBar label="6:00 PM - 8:00 PM" value="28 consultas" color="#e67e22" percent={60} />
             </div>
-            <button onClick={()=>setView('user')} style={{cursor:'pointer', padding:'10px 25px', borderRadius:'30px', border:'none', background:'#f0f0f0', fontWeight:'bold', color:'#333'}}>⬅ Volver</button>
+
+            {/* GRÁFICA: ACTIVIDAD SEMANAL */}
+            <div className="glass-panel" style={{padding:'20px', border:'1px solid #eee'}}>
+              <h4 style={{marginTop:0}}>📅 Día de más Consultas</h4>
+              <StatBar label="Lunes" value="Vanguardia" color="#2ecc71" percent={95} />
+              <StatBar label="Miércoles" value="Medio" color="#f1c40f" percent={50} />
+              <StatBar label="Sábado" value="Bajo" color="#95a5a6" percent={15} />
+            </div>
+
+            {/* DOCENTE MÁS ACTIVO */}
+            <div className="glass-panel" style={{padding:'20px', border:'1px solid #eee', background:'#003366', color:'white'}}>
+              <h4 style={{marginTop:0}}>🏆 Docente más Activo</h4>
+              <div style={{textAlign:'center', padding:'10px'}}>
+                <div style={{fontSize:'3rem'}}>⭐</div>
+                <h3 style={{margin:'10px 0'}}>Alberto G.</h3>
+                <p style={{fontSize:'0.8rem', opacity:0.8}}>124 consultas este mes</p>
+              </div>
+            </div>
           </div>
 
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'30px'}}>
-            <div style={{background:'#f5f9ff', padding:'25px', borderRadius:'20px', border:'1px solid #dbeafe'}}>
-              <h3 style={{marginTop:0, color:'#1e40af'}}>🕵️‍♂️ Diagnóstico Rápido</h3>
-              <p style={{fontSize:'0.85rem', color:'#555'}}>Verifica cédulas sin generar registros de asistencia.</p>
-              <form onSubmit={handleAdminDiagnostico} style={{marginTop:'15px'}}>
-                <input 
-                  placeholder="Cédula a probar..." 
-                  value={adminSearch}
-                  onChange={e=>setAdminSearch(e.target.value)}
-                  style={{width:'100%', padding:'10px', borderRadius:'10px', border:'1px solid #ccc', marginBottom:'10px', boxSizing:'border-box'}}
-                />
-                <button style={{width:'100%', padding:'10px', background:'#2563eb', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>Consultar Nube</button>
-              </form>
-              {adminResult && (
-                <pre style={{background:'white', padding:'10px', borderRadius:'10px', marginTop:'15px', fontSize:'0.85rem', border:'1px solid #ddd', whiteSpace:'pre-wrap', color:'#333'}}>
-                  {adminResult}
-                </pre>
-              )}
-            </div>
-
-            <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
-              <h3 style={{marginTop:0, color:'#333'}}>🚀 Accesos Directos</h3>
-              
-              <a href={URL_TU_EXCEL_MAESTRO} target="_blank" rel="noreferrer" 
-                 style={{display:'flex', alignItems:'center', gap:'15px', padding:'20px', background:'#27ae60', color:'white', textDecoration:'none', borderRadius:'15px', fontWeight:'bold', boxShadow:'0 5px 15px rgba(39, 174, 96, 0.3)'}}>
-                 <span style={{fontSize:'1.5rem'}}>📊</span> 
-                 <div>
-                   <div>Abrir Excel Maestro</div>
-                   <div style={{fontSize:'0.7rem', opacity:0.8}}>Gestión y Asistencia</div>
-                 </div>
-              </a>
-              
-              <a href={URL_FIREBASE_CONSOLE} target="_blank" rel="noreferrer" 
-                 style={{display:'flex', alignItems:'center', gap:'15px', padding:'20px', background:'#f39c12', color:'white', textDecoration:'none', borderRadius:'15px', fontWeight:'bold', boxShadow:'0 5px 15px rgba(243, 156, 18, 0.3)'}}>
-                 <span style={{fontSize:'1.5rem'}}>🔥</span>
-                 <div>
-                   <div>Consola Firebase</div>
-                   <div style={{fontSize:'0.7rem', opacity:0.8}}>Base de Datos en Vivo</div>
-                 </div>
-              </a>
-            </div>
+          <div style={{marginTop:'30px', display:'flex', gap:'15px'}}>
+            <button onClick={()=>window.open(URL_TU_EXCEL_MAESTRO)} style={{flex:1, padding:'15px', background:'#27ae60', color:'white', border:'none', borderRadius:'15px', fontWeight:'bold', cursor:'pointer'}}>EXCEL MAESTRO</button>
+            <button onClick={()=>setView('user')} style={{flex:1, padding:'15px', background:'#eee', border:'none', borderRadius:'15px', fontWeight:'bold', cursor:'pointer'}}>VOLVER</button>
           </div>
         </div>
       </div>
     );
   }
 
-  // --- VISTA USUARIO ---
   return (
     <div className="portal-container">
       <Toast msg={toast.msg} show={toast.show} />
       <style>{`
-        :root { --primary: #003366; --secondary: #D4AF37; --bg: #F0F2F5; --text: #1A1A1A; }
-        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+        :root { --primary: #003366; --secondary: #db9b32; --bg: #F0F2F5; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); }
+        .fade-in-up { animation: fadeInUp 0.5s ease-out; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .glass-panel { background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        .header { background: var(--primary); padding: 15px 20px; color: white; display: flex; justify-content: space-between; align-items: center; }
+        .main-content { max-width: 1200px; margin: 20px auto; display: grid; grid-template-columns: 320px 1fr; gap: 25px; padding: 0 15px; }
         
-        .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.08); border-radius: 20px; }
-        
-        .header { background: var(--primary); padding: 25px 0; position: relative; overflow: hidden; }
-        .header-content { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 10; }
-        .brand h1 { margin: 0; color: var(--secondary); font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; } 
-        .brand h2 { margin: 5px 0 0; font-size: 0.8rem; color: rgba(255,255,255,0.8); font-weight: 500; letter-spacing: 2px; text-transform: uppercase; }
-
-        .search-container { background: white; padding: 5px; border-radius: 50px; display: flex; box-shadow: 0 5px 20px rgba(0,0,0,0.2); transition: transform 0.2s; }
-        .search-form input { padding: 12px 20px; border-radius: 50px; border: none; outline: none; font-size: 1rem; width: 200px; }
-        .btn-search { background: var(--secondary); color: var(--primary); border: none; padding: 10px 30px; font-weight: 800; border-radius: 50px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; }
-
-        .main-content { max-width: 1200px; margin: 40px auto; padding: 0 20px; display: grid; grid-template-columns: 320px 1fr; gap: 40px; }
-        .sidebar { padding: 30px; height: fit-content; animation: fadeInUp 0.5s ease-out; }
-        .profile-header { text-align: center; margin-bottom: 30px; }
-        .avatar { width: 90px; height: 90px; background: var(--secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--primary); font-weight: bold; margin: 0 auto 15px; box-shadow: 0 10px 20px rgba(212, 175, 55, 0.3); border: 4px solid white; }
-        
-        .course-btn { width: 100%; padding: 15px 20px; margin-bottom: 12px; border: none; background: transparent; text-align: left; border-radius: 15px; position: relative; transition: all 0.2s; color: #666; cursor:pointer; border: 1px solid transparent; }
-        .course-btn.active { background: white; border-color: var(--secondary); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-        .course-btn.active .bloque-badge { background: var(--primary); color: white; }
-        .bloque-badge { display: inline-block; font-size: 0.7rem; background: #eee; padding: 2px 8px; border-radius: 10px; margin-top: 5px; font-weight: bold; color: #555; }
-
-        .hero-card { background: linear-gradient(135deg, #003366 0%, #004080 100%); color: white; padding: 40px; border-radius: 30px; position: relative; overflow: hidden; margin-bottom: 40px; box-shadow: 0 20px 40px rgba(0, 51, 102, 0.3); }
-        .hero-info-grid { display: flex; gap: 20px; margin-top: 25px; flex-wrap: wrap; background: rgba(0,0,0,0.25); padding: 15px 20px; border-radius: 15px; backdrop-filter: blur(5px); }
-        .hero-info-item { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.95rem; }
-        
-        .timeline-container { padding: 40px; background: white; border-radius: 30px; }
-        .timeline-item { display: flex; gap: 25px; margin-bottom: 30px; position: relative; }
-        .timeline-line { position: absolute; left: 24px; top: 50px; bottom: -30px; width: 3px; background: #f0f0f0; }
-        .date-circle { width: 50px; height: 50px; background: #fff; border: 3px solid #eee; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; color: #aaa; z-index: 1; }
-        
-        .timeline-content { flex: 1; background: #fcfcfc; padding: 25px; border-radius: 20px; border: 1px solid #f0f0f0; transition: all 0.3s; }
-        .timeline-content:hover { background: white; border-color: var(--secondary); box-shadow: 0 15px 30px rgba(0,0,0,0.06); }
-        
-        .zoom-mini-btn { display: inline-flex; align-items: center; gap: 8px; background: #2D8CFF; color: white; padding: 10px 20px; border-radius: 50px; text-decoration: none; font-size: 0.9rem; font-weight: bold; margin-top: 15px; }
-        .copy-icon { cursor: pointer; opacity: 0.6; font-size: 1.1rem; }
-
-        .offline-badge { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 8px 15px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; margin-top: 10px; border: 1px solid rgba(21, 101, 192, 0.1); }
-        .whatsapp-btn { position: fixed; bottom: 30px; right: 30px; background: #25D366; color: white; padding: 15px 25px; border-radius: 50px; text-decoration: none; font-weight: bold; box-shadow: 0 10px 30px rgba(37, 211, 102, 0.4); z-index: 100; }
-
-        .toast-notification { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: rgba(0,0,0,0.85); color: white; padding: 12px 24px; border-radius: 50px; font-weight: bold; opacity: 0; transition: all 0.3s; }
-        .toast-notification.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
-        @media (max-width: 900px) { 
-          .main-content { display: flex; flex-direction: column; } 
-          .sidebar { order: -1; display: flex; overflow-x: auto; padding: 15px; gap: 15px; }
-          .course-btn { min-width: 240px; margin-bottom: 0; }
+        /* 📱 AJUSTES CELULAR (MÁS PEQUEÑO) */
+        @media (max-width: 768px) {
+          .main-content { grid-template-columns: 1fr; margin-top: 10px; }
+          .sidebar { order: -1; display: flex; overflow-x: auto; padding: 10px; gap: 10px; }
+          .course-btn { min-width: 200px; padding: 10px !important; margin-bottom: 0; font-size: 0.85rem; }
+          .avatar { width: 60px !important; height: 60px !important; font-size: 1.5rem !important; }
+          .hero-card { padding: 20px !important; }
+          .hero-card h1 { font-size: 1.5rem !important; }
+          .timeline-container { padding: 20px !important; }
+          .timeline-content { padding: 12px !important; font-size: 0.9rem; }
+          .date-circle { width: 40px !important; height: 40px !important; }
         }
+
+        .course-btn { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid #eee; border-radius: 12px; background: transparent; text-align: left; cursor: pointer; }
+        .course-btn.active { background: white; border-color: var(--secondary); box-shadow: 0 5px 15px rgba(0,0,0,0.05); font-weight: bold; }
+        .hero-card { background: linear-gradient(135deg, #003366 0%, #004080 100%); color: white; padding: 35px; border-radius: 25px; margin-bottom: 25px; }
+        .timeline-item { display: flex; gap: 15px; margin-bottom: 20px; }
+        .date-circle { width: 45px; height: 45px; border: 2px solid #eee; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.7rem; color: #999; flex-shrink: 0; }
+        .timeline-content { flex: 1; background: #f9f9f9; padding: 18px; border-radius: 15px; border: 1px solid #eee; }
+        .zoom-btn { display: inline-block; background: #2D8CFF; color: white; padding: 8px 18px; border-radius: 50px; text-decoration: none; font-weight: bold; margin-top: 10px; font-size: 0.85rem; }
+        .whatsapp-btn { position: fixed; bottom: 20px; right: 20px; background: #25D366; color: white; padding: 12px 20px; border-radius: 50px; text-decoration: none; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.2); font-size: 0.9rem; }
+        .toast-notification { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: #333; color: white; padding: 10px 20px; border-radius: 50px; transition: 0.3s; opacity: 0; z-index: 999; }
+        .toast-notification.show { transform: translateX(-50%) translateY(0); opacity: 1; }
       `}</style>
-      
-      {/* LOGIN ADMIN */}
-      {view === 'login' && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', backdropFilter:'blur(5px)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}}>
-          <form onSubmit={handleLogin} className="glass-panel fade-in-up" style={{padding:'40px', width:'320px', textAlign:'center', background:'white'}}>
-            <h3 style={{color:'var(--primary)', marginTop:0, fontSize:'1.5rem'}}>Acceso Admin</h3>
-            <input type="password" placeholder="Contraseña" value={passInput} onChange={(e)=>setPassInput(e.target.value)} style={{width:'100%', padding:'15px', marginBottom:'20px', border:'1px solid #ddd', borderRadius:'12px', outline:'none', background:'#f9f9f9'}} autoFocus />
-            <div style={{display:'flex', gap:'10px'}}>
-              <button type="button" onClick={()=>setView('user')} className="rounded-btn" style={{flex:1, padding:'12px', background:'#f0f0f0', border:'none', color:'#666', fontWeight:'bold'}}>Cancelar</button>
-              <button type="submit" className="rounded-btn" style={{flex:1, background:'var(--primary)', color:'white', border:'none', fontWeight:'bold'}}>Entrar</button>
-            </div>
-          </form>
-        </div>
-      )}
 
       <header className="header">
-        <div className="header-content">
-          <div className="brand" onClick={handleReset} style={{cursor:'pointer'}}>
-            <h1>PORTAL DOCENTES</h1>
-            <h2>ADMINISTRACIÓN S.S.T.</h2>
-          </div>
-          <div className="actions">
-            {!docente && (
-              <form onSubmit={handleSearch} className="search-container">
-                <input placeholder="Cédula del Docente" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} className="search-input" />
-                <button className="btn-search rounded-btn">{loading ? '...' : 'CONSULTAR'}</button>
-              </form>
-            )}
-            {docente && <button onClick={handleReset} className="btn-search rounded-btn" style={{fontSize:'0.75rem', padding:'10px 20px'}}>↺ Salir</button>}
-          </div>
+        <div onClick={() => setDocente(null)} style={{cursor:'pointer'}}>
+          <h1 style={{margin:0, fontSize:'1.3rem', color:'var(--secondary)'}}>PORTAL CREO</h1>
+          <small>LABORATORIO v23.0</small>
         </div>
+        {!docente && (
+          <form onSubmit={handleSearch} style={{display:'flex', gap:'5px'}}>
+            <input placeholder="Cédula" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} style={{padding:'8px', borderRadius:'50px', border:'none', width:'100px'}} />
+            <button style={{background:'var(--secondary)', border:'none', padding:'8px 15px', borderRadius:'50px', fontWeight:'bold', cursor:'pointer'}}>OK</button>
+          </form>
+        )}
       </header>
 
       <main className="main-content">
         {!docente ? (
-          <div className="glass-panel fade-in-up" style={{gridColumn:'1 / -1', textAlign:'center', padding:'100px 20px'}}>
-            <div style={{fontSize:'5rem', marginBottom:'20px'}}>👨‍🏫</div>
-            <h1 style={{color:'var(--primary)', marginBottom:'15px', fontSize:'2.5rem'}}>Portal Docente</h1>
-            <p style={{color:'#666', maxWidth:'600px', margin:'0 auto', fontSize:'1.1rem'}}>Gestiona tu programación académica de forma privada y segura.</p>
-            <div style={{marginTop:'40px', fontSize:'1.2rem', color:'#333', fontWeight:'bold'}}>{formatoFechaHora().fecha}</div>
-            <div style={{marginTop:'80px', cursor:'pointer', opacity:0.3, fontSize:'0.8rem'}} onClick={()=>setView('login')}>🔒 Acceso Administrativo</div>
+          <div className="glass-panel fade-in-up" style={{gridColumn:'1 / -1', textAlign:'center', padding:'80px 20px'}}>
+            <div style={{fontSize:'4rem', marginBottom:'15px'}}>🧪</div>
+            <h2 style={{color:'var(--primary)'}}>Entorno de Pruebas</h2>
+            <p>Aquí probamos las mejoras antes de pasarlas al Portal Real.</p>
+            <div style={{marginTop:'30px', fontWeight:'bold'}}>{formatoFechaHora().fecha}</div>
+            <div style={{marginTop:'60px', opacity:0.2, cursor:'pointer', fontSize:'0.7rem'}} onClick={()=>setView('login')}>🔒 Admin Lab</div>
           </div>
         ) : (
           <>
             <aside className="sidebar glass-panel">
-              <div className="profile-header">
-                <div className="avatar">{docente.nombre.charAt(0)}</div>
-                <h3 style={{margin:0, color:'var(--primary)'}}>{getSaludo()},<br/>{docente.nombre.split(' ')[0]}</h3>
-                <div style={{fontSize:'0.85rem', color:'#888', marginTop:'5px', background:'#f5f5f5', padding:'3px 10px', borderRadius:'10px'}}>ID: {docente.idReal}</div>
+              <div style={{textAlign:'center', marginBottom:'25px'}}>
+                <div className="avatar" style={{width:'80px', height:'80px', background:'var(--secondary)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'2rem', color:'white', margin:'0 auto 10px', fontWeight:'bold'}}>{docente.nombre.charAt(0)}</div>
+                <h3 style={{margin:0}}>{docente.nombre.split(' ')[0]}</h3>
               </div>
               {docente.cursos.map((c, i) => (
                 <button key={i} onClick={()=>setSelectedCursoIdx(i)} className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}>
-                  <div style={{fontWeight:'bold', fontSize:'0.95rem', color:'var(--primary)'}}>{c.materia}</div>
-                  <div className="bloque-badge">{c.bloque}</div>
+                  {c.materia}
                 </button>
               ))}
             </aside>
 
-            <section className="dashboard-column">
-              {cursoActivo && (
-                <div className="hero-card">
-                  <h1 style={{margin:'0 0 10px', fontSize:'2.2rem'}}>{cursoActivo.materia}</h1>
-                  <div style={{fontSize:'1.1rem', opacity:0.9}}>{cursoActivo.grupo}</div>
-                  <div className="hero-info-grid">
-                    <div className="hero-info-item">📅 <strong>{cursoActivo.fInicio}</strong> (Inicio)</div>
-                    <div className="hero-info-item">🏁 <strong>{cursoActivo.fFin}</strong> (Fin)</div>
-                  </div>
-                </div>
-              )}
+            <section>
+              <div className="hero-card">
+                <h1 style={{margin:0}}>{cursoActivo.materia}</h1>
+                <p style={{opacity:0.9}}>{cursoActivo.grupo} | {cursoActivo.bloque}</p>
+              </div>
 
-              <div className="timeline-container glass-panel">
-                <h3 style={{color:'var(--primary)', marginBottom:'30px'}}>Cronograma de Actividades</h3>
-                {cursoActivo && cursoActivo.semanas.map((s, idx) => (
+              <div className="timeline-container glass-panel" style={{padding:'30px'}}>
+                {cursoActivo.semanas.map((s, idx) => (
                   <div key={idx} className="timeline-item">
-                    <div className="timeline-line"></div>
-                    <div className="date-circle">
-                      <span style={{fontSize:'0.65rem'}}>SEM</span>
-                      <span style={{fontSize:'1.3rem'}}>{s.num}</span>
-                    </div>
+                    <div className="date-circle"><strong>{s.num}</strong></div>
                     <div className="timeline-content">
-                      <div style={{fontWeight:'bold', fontSize:'1.1rem'}}>{s.fecha}</div>
-                      {s.tipo === 'INDEPENDIENTE' ? (
-                          <div className="offline-badge">🏠 {s.displayTexto}</div>
-                      ) : s.tipo === 'PRESENCIAL' ? (
-                          <div className="offline-badge">🏫 {s.displayTexto} <br/> ⏰ {s.hora}</div>
-                      ) : (
-                          <>
-                            <div style={{color:'#666', marginTop:'5px'}}>⏰ {s.hora}</div>
-                            {s.zoomLink && (
-                              <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-mini-btn" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Sem ${s.num}`)}>🎥 Unirse a Zoom</a>
-                            )}
-                          </>
-                      )}
+                      <strong>{s.fecha}</strong>
+                      <p style={{margin:'5px 0'}}>{s.displayTexto || 'Sesión Programada'}</p>
+                      {s.zoomLink && <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-btn">Unirse a Zoom</a>}
                     </div>
                   </div>
                 ))}
@@ -422,7 +236,17 @@ const App = () => {
           </>
         )}
       </main>
-      
+
+      {view === 'login' && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <div style={{background:'white', padding:'30px', borderRadius:'20px', textAlign:'center'}}>
+            <h3>Admin Lab</h3>
+            <input type="password" value={passInput} onChange={e=>setPassInput(e.target.value)} style={{padding:'10px', width:'80%', marginBottom:'20px'}} />
+            <button onClick={() => passInput === ADMIN_PASS ? setView('admin') : alert('X')} style={{padding:'10px 20px', background:'var(--primary)', color:'white', border:'none', borderRadius:'10px'}}>Entrar</button>
+          </div>
+        </div>
+      )}
+
       <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer" className="whatsapp-btn">💬 Ayuda</a>
     </div>
   );
