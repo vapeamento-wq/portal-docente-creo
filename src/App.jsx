@@ -9,7 +9,7 @@ const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0x
 const WHATSAPP_NUMBER = "573106964025";
 const ADMIN_PASS = "admincreo"; 
 
-// --- COMPONENTE TOAST (NOTIFICACIÓN FLOTANTE) ---
+// --- COMPONENTE TOAST ---
 const Toast = ({ msg, show }) => (
   <div className={`toast-notification ${show ? 'show' : ''}`}>
     {msg}
@@ -24,16 +24,34 @@ const App = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedCursoIdx, setSelectedCursoIdx] = useState(0);
   
-  // Estado para las notificaciones
+  // Reloj en vivo
+  const [fechaActual, setFechaActual] = useState(new Date());
+  
+  // Toast State
   const [toast, setToast] = useState({ show: false, msg: '' });
 
-  // --- FUNCIÓN PARA MOSTRAR NOTIFICACIÓN ---
+  // --- EFECTO RELOJ ---
+  useEffect(() => {
+    const timer = setInterval(() => setFechaActual(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatoFechaHora = () => {
+    const opcionesFecha = { weekday: 'long', day: 'numeric', month: 'long' };
+    const fecha = fechaActual.toLocaleDateString('es-CO', opcionesFecha);
+    const hora = fechaActual.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    // Capitalizar primera letra
+    return {
+        fecha: fecha.charAt(0).toUpperCase() + fecha.slice(1),
+        hora: hora
+    };
+  };
+
   const showToast = (mensaje) => {
     setToast({ show: true, msg: mensaje });
     setTimeout(() => setToast({ show: false, msg: '' }), 3000);
   };
 
-  // --- LOGS CON FEEDBACK ---
   const registrarLog = (documento, accion) => {
     showToast(`🚀 Registrando: ${accion}...`);
     try {
@@ -42,17 +60,9 @@ const App = () => {
     } catch (e) { console.error(e); }
   };
 
-  // --- COPIAR AL PORTAPAPELES ---
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    showToast("📋 ¡ID copiado al portapapeles!");
-  };
-
-  // --- FECHA Y SALUDO INTELIGENTE ---
-  const getFechaHoy = () => {
-    const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const fecha = new Date().toLocaleDateString('es-CO', opciones);
-    return fecha.charAt(0).toUpperCase() + fecha.slice(1);
+    showToast("📋 ¡ID copiado!");
   };
 
   const getSaludo = () => {
@@ -166,18 +176,13 @@ const App = () => {
   const docente = useMemo(() => selectedId ? state.teachers[selectedId] : null, [selectedId, state.teachers]);
   const cursoActivo = docente && docente.cursos.length > 0 ? docente.cursos[selectedCursoIdx] : null;
 
-  const proximaClase = useMemo(() => {
-    if (!cursoActivo) return null;
-    return cursoActivo.semanas[0]; 
-  }, [cursoActivo]);
-
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
     if (state.teachers[idBusqueda] && state.teachers[idBusqueda].cursos.length > 0) {
       setSelectedId(idBusqueda);
       setSelectedCursoIdx(0);
-      showToast('✅ ¡Bienvenido! Cargando sus datos...');
+      showToast('✅ ¡Bienvenido!');
       registrarLog(idBusqueda, '✅ Consulta Exitosa');
     } else { 
       if(state.teachers[idBusqueda]) alert("Docente encontrado pero SIN asignación visible.");
@@ -290,9 +295,10 @@ const App = () => {
         .timeline-line { position: absolute; left: 24px; top: 50px; bottom: -30px; width: 3px; background: #f0f0f0; z-index: 0; }
         .timeline-item:last-child .timeline-line { display: none; }
         .date-circle { width: 50px; height: 50px; background: #fff; border: 3px solid #eee; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; color: #aaa; z-index: 1; flex-shrink: 0; transition: all 0.3s; }
-        .timeline-item.active .date-circle { border-color: var(--secondary); color: var(--primary); background: #fffdf5; box-shadow: 0 0 0 6px rgba(212, 175, 55, 0.15); transform: scale(1.1); }
+        .date-circle.active { border-color: var(--secondary); color: var(--primary); background: #fffdf5; box-shadow: 0 0 0 6px rgba(212, 175, 55, 0.15); transform: scale(1.1); }
+        
         .timeline-content { flex: 1; background: #fcfcfc; padding: 25px; border-radius: 20px; border: 1px solid #f0f0f0; transition: all 0.3s; }
-        .timeline-item.active .timeline-content { background: white; border-color: var(--secondary); box-shadow: 0 15px 30px rgba(0,0,0,0.06); transform: translateX(5px); }
+        .timeline-content:hover { background: white; border-color: var(--secondary); box-shadow: 0 15px 30px rgba(0,0,0,0.06); transform: translateX(5px); }
         
         .zoom-mini-btn { display: inline-flex; align-items: center; gap: 8px; background: #2D8CFF; color: white; padding: 10px 20px; border-radius: 50px; text-decoration: none; font-size: 0.9rem; font-weight: bold; margin-top: 15px; box-shadow: 0 5px 15px rgba(45, 140, 255, 0.3); transition: transform 0.2s; }
         .zoom-mini-btn:hover { transform: translateY(-2px); }
@@ -325,7 +331,7 @@ const App = () => {
         </div>
       )}
 
-      <div className="test-banner">💎 EDICIÓN PREMIUM v12.0 (Toasts + Copy + Animaciones)</div>
+      <div className="test-banner">💎 EDICIÓN PREMIUM v13.0 (Reloj en Vivo + Limpieza)</div>
 
       <header className="header">
         <div className="header-content">
@@ -354,8 +360,8 @@ const App = () => {
             <p style={{color:'#666', maxWidth:'600px', margin:'0 auto', fontSize:'1.1rem', lineHeight:'1.6'}}>
               Gestiona tu programación académica, accede a tus aulas virtuales y consulta tus grupos de forma centralizada.
             </p>
-            <div style={{marginTop:'40px', fontSize:'0.9rem', color:'#888'}}>
-              {getFechaHoy()}
+            <div style={{marginTop:'40px', fontSize:'1.2rem', color:'#333', fontWeight:'bold'}}>
+              {formatoFechaHora().fecha}
             </div>
             <div style={{marginTop:'80px', cursor:'pointer', opacity:0.3, fontSize:'0.8rem'}} onClick={()=>setView('login')}>🔒 Acceso Administrativo</div>
           </div>
@@ -366,8 +372,16 @@ const App = () => {
               <div className="profile-header">
                 <div className="avatar">{docente.nombre.charAt(0)}</div>
                 <h3 style={{margin:0, color:'var(--primary)'}}>{getSaludo()},<br/>{docente.nombre.split(' ')[0]}</h3>
-                <div style={{fontSize:'0.85rem', color:'#888', marginTop:'5px', background:'#f5f5f5', display:'inline-block', padding:'3px 10px', borderRadius:'10px'}}>
+                
+                {/* ID DEL DOCENTE */}
+                <div style={{fontSize:'0.85rem', color:'#888', marginTop:'5px', background:'#f5f5f5', display:'inline-block', padding:'3px 10px', borderRadius:'10px', marginBottom:'10px'}}>
                   ID: {docente.idReal}
+                </div>
+
+                {/* RELOJ EN VIVO (ZONA VISIBLE ESCRITORIO) */}
+                <div style={{fontSize:'0.8rem', color:'#555', borderTop:'1px solid #eee', paddingTop:'10px'}}>
+                    <div>{formatoFechaHora().fecha}</div>
+                    <div style={{fontWeight:'bold', fontSize:'1.1rem', color:'var(--secondary)'}}>{formatoFechaHora().hora}</div>
                 </div>
               </div>
               
@@ -390,7 +404,7 @@ const App = () => {
             {/* DASHBOARD */}
             <section className="dashboard-column">
               
-              {/* HERO CARD DETALLADA */}
+              {/* HERO CARD DETALLADA (SIN BOTÓN) */}
               {cursoActivo && (
                 <div className="hero-card">
                   <div className="hero-content">
@@ -414,18 +428,6 @@ const App = () => {
                         <div className="hero-info-item">🏁 <strong>{cursoActivo.fFin}</strong> <span style={{opacity:0.6, fontSize:'0.8rem'}}> (Fin)</span></div>
                       </div>
                     </div>
-
-                    {/* Botón Principal Animado */}
-                    {proximaClase && proximaClase.zoomLink && (
-                        <div style={{marginTop:'20px', textAlign:'center'}}>
-                          <a href={proximaClase.zoomLink} target="_blank" rel="noreferrer" className="big-btn rounded-btn" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Hero ${proximaClase.num}`)}>
-                            <span>ENTRAR A CLASE</span>
-                          </a>
-                          <div style={{marginTop:'10px', fontSize:'0.8rem', opacity:0.8}}>
-                            Sala de Videoconferencia
-                          </div>
-                        </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -438,9 +440,8 @@ const App = () => {
                 </div>
                 
                 {cursoActivo && cursoActivo.semanas.map((s, idx) => {
-                  const isActive = idx === 0; 
                   return (
-                    <div key={idx} className={`timeline-item ${isActive ? 'active' : ''}`}>
+                    <div key={idx} className="timeline-item">
                       <div className="timeline-line"></div>
                       <div className="date-circle">
                         <span style={{fontSize:'0.65rem', textTransform:'uppercase'}}>Sem</span>
@@ -448,10 +449,9 @@ const App = () => {
                       </div>
                       <div className="timeline-content">
                         <div style={{display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:'10px'}}>
-                           <div style={{fontWeight:'bold', fontSize:'1.1rem', color: isActive ? 'var(--primary)' : '#444'}}>
+                           <div style={{fontWeight:'bold', fontSize:'1.1rem', color:'#444'}}>
                              {s.fecha}
                            </div>
-                           {isActive && <span style={{background:'var(--secondary)', color:'var(--primary)', fontSize:'0.7rem', padding:'2px 8px', borderRadius:'5px', fontWeight:'bold', height:'fit-content'}}>HOY</span>}
                         </div>
                         
                         {/* TIPOS DE CLASE */}
