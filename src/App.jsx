@@ -2,16 +2,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 
 // --- CONFIGURACIÓN DE LABORATORIO 🧪 (TOTALMENTE INDEPENDIENTE) ---
 
-// 1. BASE DE DATOS DE PRUEBA (La copia que creaste)
+// 1. BASE DE DATOS DE PRUEBA (Para buscar docentes)
 const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQqVxPhQsuX9SKXsPSj9P5iaL__B0eAt7jzVj8HMnxKW6QTkD6IUuS9eFYTwYep2G6x2rn8uKlfnvsO/pub?output=csv";
 
-// 2. NUEVO SCRIPT DE LOGS (El que acabas de crear)
+// 2. SCRIPT DE LOGS DE PRUEBA (Para guardar la asistencia)
 const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbxXAXa1VXPf8mKv0x_yZ__dnRNIMP9yZrIWO1xXvN24V76WWs9jt6O6T5ut_HLPVtyI/exec";
 
-// 3. VISOR DEL ADMIN (OJO: Aquí dejé los links del Excel original para que no te salga error, 
-// pero si quieres ver el Excel Nuevo, tendrías que cambiar estos dos links por los de tu hoja de pruebas)
-const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/edit?gid=0#gid=0";
-const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/17NLfm6gxCF__YCfXUUfz4Ely5nJqMAHk-DqDolPvdNY/preview?gid=0";
+// 3. VISOR DEL ADMIN (Excel de Pruebas - El link nuevo que me diste)
+const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/edit?gid=0#gid=0";
+const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/preview?gid=0";
 
 const WHATSAPP_NUMBER = "573106964025";
 const ADMIN_PASS = "admincreo"; 
@@ -27,7 +26,7 @@ const App = () => {
   // --- LOGS (TEST) ---
   const registrarLog = (documento, accion) => {
     try {
-      // Manda el log al NUEVO script
+      // Manda el log al script de pruebas con la etiqueta [TEST]
       const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: `[TEST] ${accion}` };
       fetch(URL_SCRIPT_APPS, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datosLog) }).catch(err => console.log(err));
     } catch (e) { console.error(e); }
@@ -92,13 +91,17 @@ const App = () => {
       <div style={{fontFamily:'Segoe UI', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
         <div style={{maxWidth:'1000px', width:'100%', background:'white', padding:'30px', borderRadius:'15px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)'}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:'20px'}}>
-            <h2>PANEL ADMIN (LABORATORIO)</h2>
+            <div>
+              <h2 style={{margin:0, color:'#003366'}}>PANEL ADMIN (LABORATORIO)</h2>
+              <small style={{color:'purple'}}>Viendo Logs de Prueba</small>
+            </div>
             <div style={{display:'flex', gap:'10px'}}>
-               <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px', borderRadius:'5px'}}>Abrir Excel</a>
-               <button onClick={()=>setView('user')} style={{cursor:'pointer'}}>⬅ Salir</button>
+               <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px', borderRadius:'5px', fontWeight:'bold'}}>Abrir Excel Nuevo</a>
+               <button onClick={()=>setView('user')} style={{cursor:'pointer', padding:'10px'}}>⬅ Salir</button>
             </div>
           </div>
-          <iframe src={URL_EMBED_LOGS} style={{width:'100%', height:'500px', border:'none'}} title="Logs"></iframe>
+          {/* VISOR DE EXCEL DE PRUEBAS */}
+          <iframe src={URL_EMBED_LOGS} style={{width:'100%', height:'500px', border:'2px solid purple', borderRadius:'10px'}} title="Logs de Prueba"></iframe>
         </div>
       </div>
     );
@@ -147,7 +150,7 @@ const App = () => {
       )}
 
       {/* AVISO DE ENTORNO SEGURO */}
-      <div className="test-banner">🧪 ESTÁS EN EL LABORATORIO (LOGS SEPARADOS)</div>
+      <div className="test-banner">🧪 ESTÁS EN EL LABORATORIO (LOGS SEPARADOS Y CONFIRMADOS)</div>
 
       <header className="header">
         <div className="header-content">
