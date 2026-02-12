@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- CONFIGURACIÓN DE LABORATORIO 🧪 (TOTALMENTE INDEPENDIENTE) ---
+// --- CONFIGURACIÓN DE LABORATORIO 🧪 (DATOS DE PRUEBA) ---
+// Usamos los datos de prueba para que el portal sea seguro de usar sin dañar el real.
 
-// 1. BASE DE DATOS DE PRUEBA (Para buscar docentes)
+// 1. BASE DE DATOS DE PRUEBA
 const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQqVxPhQsuX9SKXsPSj9P5iaL__B0eAt7jzVj8HMnxKW6QTkD6IUuS9eFYTwYep2G6x2rn8uKlfnvsO/pub?output=csv";
 
-// 2. SCRIPT DE LOGS DE PRUEBA (Para guardar la asistencia)
+// 2. SCRIPT DE LOGS DE PRUEBA
 const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbxXAXa1VXPf8mKv0x_yZ__dnRNIMP9yZrIWO1xXvN24V76WWs9jt6O6T5ut_HLPVtyI/exec";
 
-// 3. VISOR DEL ADMIN (Excel de Pruebas - El link nuevo que me diste)
+// 3. VISOR DEL ADMIN (Excel de Pruebas)
 const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/edit?gid=0#gid=0";
 const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/preview?gid=0";
 
@@ -91,12 +92,15 @@ const App = () => {
       <div style={{fontFamily:'Segoe UI', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
         <div style={{maxWidth:'1000px', width:'100%', background:'white', padding:'30px', borderRadius:'15px', boxShadow:'0 10px 25px rgba(0,0,0,0.1)'}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:'20px'}}>
-            <div>
-              <h2 style={{margin:0, color:'#003366'}}>PANEL ADMIN (LABORATORIO)</h2>
-              <small style={{color:'purple'}}>Viendo Logs de Prueba</small>
+            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+              <span style={{fontSize:'2rem'}}>📂</span>
+              <div>
+                <h2 style={{color:'#003366', margin:0}}>PANEL ADMINISTRATIVO</h2>
+                <small style={{color:'#666'}}>Modo Laboratorio 🧪</small>
+              </div>
             </div>
             <div style={{display:'flex', gap:'10px'}}>
-               <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px', borderRadius:'5px', fontWeight:'bold'}}>Abrir Excel Nuevo</a>
+               <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px', borderRadius:'5px', fontWeight:'bold'}}>Abrir Excel</a>
                <button onClick={()=>setView('user')} style={{cursor:'pointer', padding:'10px'}}>⬅ Salir</button>
             </div>
           </div>
@@ -107,18 +111,19 @@ const App = () => {
     );
   }
 
-  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando Base de Pruebas...</p></div>;
+  if (state.loading) return <div className="loading-screen"><div className="spinner"></div><p>Cargando...</p></div>;
   if (state.error) return <div className="error-screen">{state.error}</div>;
 
   return (
     <div className="portal-container">
       <style>{`
-        :root { --primary: #003366; --secondary: #D4AF37; --orange: #FF6600; --bg: #f4f6f8; --text: #333; --test-alert: #8e44ad; }
+        :root { --primary: #003366; --secondary: #D4AF37; --orange: #FF6600; --bg: #f4f6f8; --text: #333; --test-alert: #e74c3c; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
         .test-banner { background: var(--test-alert); color: white; text-align: center; padding: 8px; font-weight: bold; font-size: 0.9rem; letter-spacing: 1px; }
         .header { background: var(--primary); padding: 15px 0; border-bottom: 4px solid var(--secondary); }
         .header-content { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
-        .brand h1 { margin: 0; color: var(--orange); font-size: 1.5rem; } .brand h2 { color: white; font-size: 0.8rem; margin:0; }
+        .brand h1 { margin: 0; color: var(--orange); font-size: 1.6rem; font-weight: 800; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); } 
+        .brand h2 { margin: 5px 0 0; font-size: 0.75rem; color: white; font-weight: 600; letter-spacing: 1px; opacity: 0.9; }
         .main-content { max-width: 1200px; margin: 30px auto; padding: 0 20px; display: flex; gap: 30px; flex-wrap: wrap; }
         .search-form input { padding: 8px; border-radius: 4px; border: none; }
         .btn-search { background: var(--secondary); border: none; padding: 8px 15px; font-weight: bold; cursor: pointer; margin-left: 5px; }
@@ -139,7 +144,7 @@ const App = () => {
       {view === 'login' && (
         <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}}>
           <form onSubmit={handleLogin} style={{background:'white', padding:'30px', borderRadius:'10px', width:'300px', textAlign:'center'}}>
-            <h3 style={{color:'var(--primary)', marginTop:0}}>Admin Laboratorio</h3>
+            <h3 style={{color:'var(--primary)', marginTop:0}}>Acceso Admin</h3>
             <input type="password" placeholder="Pass: admincreo" value={passInput} onChange={(e)=>setPassInput(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ddd', borderRadius:'5px'}} autoFocus />
             <div style={{display:'flex', gap:'10px'}}>
               <button type="button" onClick={()=>setView('user')} style={{flex:1, padding:'10px', cursor:'pointer'}}>Cancelar</button>
@@ -150,13 +155,13 @@ const App = () => {
       )}
 
       {/* AVISO DE ENTORNO SEGURO */}
-      <div className="test-banner">🧪 ESTÁS EN EL LABORATORIO (LOGS SEPARADOS Y CONFIRMADOS)</div>
+      <div className="test-banner">⚠️ MODO LABORATORIO DE PRUEBAS</div>
 
       <header className="header">
         <div className="header-content">
           <div className="brand" onClick={handleReset} style={{cursor:'pointer'}}>
-            <h1>PORTAL DOCENTES (LABORATORIO)</h1>
-            <h2>ADMINISTRACIÓN S.S.T.</h2>
+            <h1>PORTAL DOCENTES CREO</h1>
+            <h2>ADMINISTRACIÓN DE LA SEGURIDAD Y SALUD EN EL TRABAJO</h2>
           </div>
           <div className="actions">
             {!docente && <form onSubmit={handleSearch} className="search-form"><input placeholder="Documento..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} /><button className="btn-search">BUSCAR</button></form>}
@@ -167,17 +172,19 @@ const App = () => {
 
       <main className="main-content">
         {!docente ? (
-          <div style={{textAlign:'center', width:'100%', padding:'50px', background:'white', borderRadius:'10px'}}>
-            <h2>Bienvenido al Laboratorio</h2>
-            <p>Ingresa un documento que exista en tu EXCEL DE PRUEBAS.</p>
-            <div style={{marginTop:'20px', cursor:'pointer', opacity:0.5}} onClick={()=>setView('login')}>🔒 Admin Logs</div>
+          <div style={{textAlign:'center', width:'100%', padding:'50px', background:'white', borderRadius:'10px', boxShadow:'0 4px 10px rgba(0,0,0,0.05)'}}>
+            <h2 style={{color:'var(--primary)'}}>Bienvenido a la consulta de sus asignaciones</h2>
+            <p>Ingrese su número de documento en la parte superior.</p>
+            <div style={{marginTop:'40px', cursor:'pointer', opacity:0.3}} onClick={()=>setView('login')}>🔒 Admin</div>
           </div>
         ) : (
           <>
             <aside className="sidebar">
-              <h3>{docente.nombre}</h3>
-              <p>ID: {docente.idReal}</p>
-              <hr/>
+              <div style={{marginBottom:'15px'}}>
+                <h3 style={{margin:0, color:'var(--primary)'}}>{docente.nombre}</h3>
+                <small>ID: {docente.idReal}</small>
+              </div>
+              <div style={{fontSize:'0.7rem', fontWeight:'bold', color:'var(--secondary)', marginBottom:'10px'}}>ASIGNATURAS</div>
               {docente.cursos.map((c, i) => (
                 <button key={i} onClick={()=>setSelectedCursoIdx(i)} className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}>
                   <b>{c.materia}</b><br/><small>Grupo {c.grupo}</small>
@@ -185,13 +192,16 @@ const App = () => {
               ))}
             </aside>
             <section className="dashboard">
-              <h2 style={{margin:0, color:'var(--primary)', borderBottom:'2px solid var(--secondary)', paddingBottom:'10px'}}>{cursoActivo.materia}</h2>
+              <div style={{background:'var(--primary)', color:'white', padding:'15px', borderRadius:'5px 5px 0 0', marginBottom:'15px'}}>
+                <h3 style={{margin:0}}>{cursoActivo.materia}</h3>
+              </div>
               <div className="weeks-grid">
                 {cursoActivo.semanas.map((s, idx) => (
                   <div key={idx} className="week-card">
-                    <strong>SEMANA {s.num}</strong>
-                    <div>{s.fecha} - {s.hora}</div>
-                    {s.zoomLink && <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-link" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Sem ${s.num}`)}>ENTRAR CLASE</a>}
+                    <strong style={{color:'var(--secondary)', fontSize:'0.8rem'}}>SEMANA {s.num}</strong>
+                    <div style={{margin:'5px 0', fontWeight:'bold'}}>{s.fecha}</div>
+                    <div style={{fontSize:'0.9rem', color:'#666', marginBottom:'10px'}}>{s.hora}</div>
+                    {s.zoomLink && <a href={s.zoomLink} target="_blank" rel="noreferrer" className="zoom-link" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Sem ${s.num}`)}>ENTRAR A CLASE</a>}
                   </div>
                 ))}
               </div>
