@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
 // --- CONFIGURACIÓN DE LABORATORIO SEGURA 🔒 ---
-// Esta es la URL de tu API Privada (Google Apps Script)
+// Tu URL del Script (La misma que ya tenías funcionando)
 const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbzwqjbrBAsEPFDXSt7NqdW8AK201RJxLc8Szg-AphN2DZQ8yT-2AyRCxbGy9x5ape4H/exec";
 
-// Links para el Admin (Solo tú los usas)
 const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/edit?gid=0#gid=0";
 const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/preview?gid=0";
 
@@ -20,7 +19,7 @@ const App = () => {
   const [view, setView] = useState('user'); 
   const [passInput, setPassInput] = useState('');
   
-  // Estado de carga y datos (Modo API)
+  // Estado de carga y datos
   const [loading, setLoading] = useState(false); 
   const [searchTerm, setSearchTerm] = useState('');
   const [docente, setDocente] = useState(null); 
@@ -47,10 +46,10 @@ const App = () => {
     setTimeout(() => setToast({ show: false, msg: '' }), 3000);
   };
 
+  // --- LOGS SILENCIOSOS (MODO NINJA 🥷) ---
   const registrarLog = (documento, accion) => {
-    showToast(`🚀 Registrando: ${accion}...`);
+    // YA NO MOSTRAMOS TOAST AQUÍ. El usuario no se entera, pero se guarda.
     try {
-      // Enviamos el log al mismo script (doPost)
       const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: `[SECURE] ${accion}` };
       fetch(URL_SCRIPT_APPS, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datosLog) }).catch(err => console.log(err));
     } catch (e) { console.error(e); }
@@ -81,7 +80,6 @@ const App = () => {
     setLoading(true);
     setDocente(null);
 
-    // CONSULTA A TU SCRIPT PRIVADO
     fetch(`${URL_SCRIPT_APPS}?id=${idBusqueda}`)
       .then(res => res.json())
       .then(response => {
@@ -90,14 +88,11 @@ const App = () => {
         if (response.encontrado && response.data) {
           const docenteData = response.data;
           
-          // PROCESAR SEMANAS (Lógica v13.1 integrada)
           docenteData.cursos = docenteData.cursos.map(curso => {
             const semanasProcesadas = [];
             
-            // Iteramos sobre el array crudo de semanas que devuelve el script
             curso.semanasRaw.forEach((texto, i) => {
-               if (i >= 16) return; // Limite 16 semanas
-               // Filtros de limpieza
+               if (i >= 16) return; 
                if (!texto || texto.length < 5 || texto.startsWith("-") || texto.toLowerCase().includes("pendiente")) return;
 
                let tipo = 'ZOOM';
@@ -109,7 +104,6 @@ const App = () => {
                
                const textoUpper = texto.toUpperCase();
 
-               // CLASIFICACIÓN
                if (textoUpper.includes("TRABAJO INDEPEN") || textoUpper.includes("TRABAJO AUTONOMO")) {
                    tipo = 'INDEPENDIENTE';
                    displayTexto = "Trabajo Independiente";
@@ -123,7 +117,6 @@ const App = () => {
                    if (texto.includes("Salón") || texto.includes("Aula")) ubicacion = texto;
                }
                else {
-                   // Lógica Zoom
                    const idMatch = texto.match(/ID\s*[-:.]?\s*(\d{9,11})/i);
                    zoomId = idMatch ? idMatch[1] : null;
                    if (zoomId) finalLink = `https://zoom.us/j/${zoomId}`;
@@ -137,12 +130,10 @@ const App = () => {
                    }
                }
 
-               // EXTRACCIÓN DE HORA
                const horaMatch = texto.match(/(\d{1,2}\s*[aA]\s*\d{1,2})/i); 
                let horaDisplay = horaMatch ? horaMatch[0] : "Programada";
                if (esTrabajoIndependiente) horaDisplay = "Todo el día";
 
-               // FECHA
                const partes = texto.split('-');
                let fechaDisplay = partes[0] || `Semana ${i+1}`;
                fechaDisplay = fechaDisplay.replace(/^202[0-9]\s*\/\s*/, '').replace(/\s*\/\s*/g, '/');
@@ -163,7 +154,8 @@ const App = () => {
 
           setDocente(docenteData);
           setSelectedCursoIdx(0);
-          showToast('✅ ¡Bienvenido!');
+          // Quitamos también el toast de bienvenida para que sea más limpio, o lo dejamos si te gusta.
+          // showToast('✅ ¡Bienvenido!'); 
           registrarLog(idBusqueda, '✅ Consulta Exitosa (Secure)');
 
         } else {
@@ -186,8 +178,6 @@ const App = () => {
   };
 
   const cursoActivo = docente && docente.cursos.length > 0 ? docente.cursos[selectedCursoIdx] : null;
-  // Calculamos próxima clase del curso activo
-  const proximaClase = cursoActivo && cursoActivo.semanas.length > 0 ? cursoActivo.semanas[0] : null;
 
   if (view === 'admin') {
     return (
@@ -262,8 +252,6 @@ const App = () => {
         .hero-info-grid { display: flex; gap: 20px; margin-top: 25px; flex-wrap: wrap; background: rgba(0,0,0,0.25); padding: 15px 20px; border-radius: 15px; backdrop-filter: blur(5px); }
         .hero-info-item { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.95rem; color: rgba(255,255,255,0.9); }
         
-        .big-btn { background: var(--secondary); color: var(--primary); text-decoration: none; padding: 15px 40px; border-radius: 50px; font-weight: 800; font-size: 1.1rem; box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform 0.2s; }
-        
         .timeline-container { padding: 40px; background: white; border-radius: 30px; animation: fadeInUp 0.7s ease-out; }
         .timeline-item { display: flex; gap: 25px; margin-bottom: 30px; position: relative; }
         .timeline-line { position: absolute; left: 24px; top: 50px; bottom: -30px; width: 3px; background: #f0f0f0; z-index: 0; }
@@ -301,7 +289,7 @@ const App = () => {
         </div>
       )}
 
-      <div className="test-banner">🔒 MODO SEGURO v14.0 (Datos Privados + Correcciones)</div>
+      <div className="test-banner">🔒 MODO SEGURO v17.0 (Logs Silenciosos)</div>
 
       <header className="header">
         <div className="header-content">
