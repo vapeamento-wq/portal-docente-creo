@@ -42,20 +42,28 @@ const App = () => {
           let rawId = c[7]?.replace(/"/g, '').trim(); 
           const id = rawId ? rawId.split('.')[0] : null;
 
-          // --- MAPEO NUEVO SEGÚN TUS INSTRUCCIONES ---
-          const bloque = c[11]?.replace(/"/g, '').trim();   // Col L: Bloque
-          const fInicio = c[12]?.replace(/"/g, '').trim();  // Col M: Fecha Inicio
-          const fFin = c[13]?.replace(/"/g, '').trim();     // Col N: Fecha Fin
+          // --- 📍 COORDENADAS RECALIBRADAS (v11.1) ---
+          // Bloque: Columna T (Índice 19)
+          const bloqueRaw = c[19]?.replace(/"/g, '').trim(); 
+          const bloque = bloqueRaw && bloqueRaw.toLowerCase().includes("bloque") ? bloqueRaw : "Bloque General";
+
+          // Fechas: Columnas BB (53) y BC (54)
+          // Vienen formato YYYY-MM-DD, las convertimos para que se vean bonitas
+          const rawInicio = c[53]?.replace(/"/g, '').trim();
+          const rawFin = c[54]?.replace(/"/g, '').trim();
+          
+          const fInicio = rawInicio || "Por definir";
+          const fFin = rawFin || "Por definir";
 
           const semanas = [];
           
+          // El bucle de semanas comienza en la columna 55
           for (let i = 0; i < 16; i++) { 
             const colIndex = 55 + i; 
             const texto = c[colIndex]?.replace(/"/g, '').trim() || "";
             
             if (texto && texto.length > 5 && !texto.startsWith("-") && !texto.toLowerCase().includes("pendiente")) {
               
-              // --- 1. DETECCIÓN DE TIPO DE CLASE ---
               let tipo = 'ZOOM';
               let displayTexto = '';
               let ubicacion = '';
@@ -65,26 +73,20 @@ const App = () => {
               
               const textoUpper = texto.toUpperCase();
 
-              // CASO A: TRABAJO INDEPENDIENTE
+              // Lógica de Tipos de Clase
               if (textoUpper.includes("TRABAJO INDEPEN") || textoUpper.includes("TRABAJO AUTONOMO")) {
                   tipo = 'INDEPENDIENTE';
                   displayTexto = "Trabajo Independiente";
                   ubicacion = "Estudio Autónomo";
                   esTrabajoIndependiente = true;
               } 
-              // CASO B: PRESENCIAL
               else if (textoUpper.includes("PRESENCIAL") || textoUpper.includes("CAMPUS")) {
                   tipo = 'PRESENCIAL';
                   displayTexto = "Campus Principal - Presencial";
                   ubicacion = "Sede Principal";
-                  // Intentamos buscar detalles de salón si los hay
-                  if (texto.includes("Salón") || texto.includes("Aula")) {
-                      ubicacion = texto; // O usar regex para extraer salón
-                  }
+                  if (texto.includes("Salón") || texto.includes("Aula")) ubicacion = texto;
               }
-              // CASO C: ZOOM (Standard)
               else {
-                  // Extraer ID
                   const idMatch = texto.match(/ID\s*[-:.]?\s*(\d{9,11})/i);
                   zoomId = idMatch ? idMatch[1] : null;
 
@@ -100,14 +102,10 @@ const App = () => {
                   }
               }
 
-              // --- 2. EXTRACCIÓN DE HORA ---
-              // Solo buscamos hora si NO es trabajo independiente (o si el texto trae hora explicita)
               const horaMatch = texto.match(/(\d{1,2}\s*[aA]\s*\d{1,2})/i); 
               let horaDisplay = horaMatch ? horaMatch[0] : "Programada";
-              
               if (esTrabajoIndependiente) horaDisplay = "Todo el día";
 
-              // --- 3. EXTRACCIÓN DE FECHA ---
               const partes = texto.split('-');
               let fechaDisplay = partes[0] || `Semana ${i+1}`;
               fechaDisplay = fechaDisplay.replace(/^202[0-9]\s*\/\s*/, '').replace(/\s*\/\s*/g, '/');
@@ -230,8 +228,8 @@ const App = () => {
         }
 
         .hero-card { background: linear-gradient(135deg, #003366 0%, #004080 100%); color: white; padding: 40px; border-radius: 25px; position: relative; overflow: hidden; margin-bottom: 40px; box-shadow: 0 20px 40px rgba(0, 51, 102, 0.3); }
-        .hero-info-grid { display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
-        .hero-info-item { background: rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 10px; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+        .hero-info-grid { display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px; }
+        .hero-info-item { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.95rem; }
         
         .big-btn { background: var(--secondary); color: var(--primary); text-decoration: none; padding: 15px 40px; border-radius: 50px; font-weight: 800; font-size: 1.1rem; box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform 0.2s; }
         
@@ -265,7 +263,7 @@ const App = () => {
         </div>
       )}
 
-      <div className="test-banner">⚠️ MODO LABORATORIO v11.0 (Fechas y Bloques)</div>
+      <div className="test-banner">⚠️ MODO LABORATORIO v11.1 (Coordenadas Exactas)</div>
 
       <header className="header">
         <div className="header-content">
@@ -309,7 +307,7 @@ const App = () => {
                 <button key={i} onClick={()=>setSelectedCursoIdx(i)} className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}>
                   <div style={{fontWeight:'bold', fontSize:'0.9rem'}}>{c.materia}</div>
                   <div style={{fontSize:'0.75rem', marginTop:'3px', opacity:0.8}}>
-                    {c.bloque ? `Bloque: ${c.bloque}` : `Grupo ${c.grupo}`}
+                    {c.bloque}
                   </div>
                 </button>
               ))}
@@ -323,18 +321,24 @@ const App = () => {
                 <div className="hero-card">
                   <div className="hero-content">
                     <div style={{flex:1}}>
-                      <span className="hero-badge">🌟 Asignatura Actual</span>
-                      <h1 style={{margin:'0 0 10px', fontSize:'2rem', lineHeight:'1.2'}}>{cursoActivo.materia}</h1>
+                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                         <span className="hero-badge">🌟 Asignatura Actual</span>
+                         <span style={{background:'rgba(255,255,255,0.2)', padding:'5px 15px', borderRadius:'15px', fontSize:'0.8rem', fontWeight:'bold'}}>
+                           {cursoActivo.bloque}
+                         </span>
+                      </div>
                       
-                      {/* NUEVO: GRID DE INFO DEL CURSO */}
+                      <h1 style={{margin:'10px 0', fontSize:'2rem', lineHeight:'1.2'}}>{cursoActivo.materia}</h1>
+                      
+                      {/* GRID DE FECHAS */}
                       <div className="hero-info-grid">
-                        <div className="hero-info-item">📅 Inicio: {cursoActivo.fInicio || 'N/A'}</div>
-                        <div className="hero-info-item">🏁 Fin: {cursoActivo.fFin || 'N/A'}</div>
-                        <div className="hero-info-item">🏫 {cursoActivo.bloque || 'Sin Bloque'}</div>
+                        <div className="hero-info-item">📅 Inicio: <strong>{cursoActivo.fInicio}</strong></div>
+                        <div style={{width:'1px', height:'20px', background:'rgba(255,255,255,0.3)'}}></div>
+                        <div className="hero-info-item">🏁 Fin: <strong>{cursoActivo.fFin}</strong></div>
                       </div>
                     </div>
 
-                    {/* Botón de Acción Principal (Solo si hay clase hoy/próxima con Zoom) */}
+                    {/* Botón de Acción Principal */}
                     {proximaClase && proximaClase.zoomLink && (
                         <div style={{marginTop:'20px'}}>
                           <a href={proximaClase.zoomLink} target="_blank" rel="noreferrer" className="big-btn rounded-btn" onClick={()=>registrarLog(docente.idReal, `🎥 Zoom Hero ${proximaClase.num}`)}>
