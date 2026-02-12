@@ -53,7 +53,6 @@ const App = () => {
             
             if (texto && texto.length > 5 && !texto.startsWith("-") && !texto.toLowerCase().includes("pendiente")) {
               
-              // EXTRACTORES
               const idMatch = texto.match(/ID\s*[-:.]?\s*(\d{9,11})/i);
               const extractedId = idMatch ? idMatch[1] : null;
 
@@ -99,11 +98,8 @@ const App = () => {
   const docente = useMemo(() => selectedId ? state.teachers[selectedId] : null, [selectedId, state.teachers]);
   const cursoActivo = docente && docente.cursos.length > 0 ? docente.cursos[selectedCursoIdx] : null;
 
-  // Lógica "Inteligente": Buscar la próxima clase (la primera que no haya pasado o la primera disponible)
   const proximaClase = useMemo(() => {
     if (!cursoActivo) return null;
-    // Por simplicidad, tomamos la primera de la lista como "Próxima" si no hay lógica de fechas real
-    // (En un futuro podríamos comparar con new Date())
     return cursoActivo.semanas[0]; 
   }, [cursoActivo]);
 
@@ -176,21 +172,61 @@ const App = () => {
 
         .main-content { max-width: 1200px; margin: 40px auto; padding: 0 20px; display: grid; grid-template-columns: 300px 1fr; gap: 30px; }
         
-        /* SIDEBAR */
+        /* SIDEBAR (Escritorio) */
         .sidebar { padding: 30px; height: fit-content; }
         .profile-header { text-align: center; margin-bottom: 30px; }
         .avatar { width: 80px; height: 80px; background: var(--secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--primary); font-weight: bold; margin: 0 auto 15px; box-shadow: 0 10px 20px rgba(212, 175, 55, 0.3); }
-        .course-btn { width: 100%; padding: 15px 20px; margin-bottom: 10px; border: none; background: transparent; text-align: left; border-radius: 15px; position: relative; transition: all 0.2s; color: #666; }
+        .course-btn { width: 100%; padding: 15px 20px; margin-bottom: 10px; border: none; background: transparent; text-align: left; border-radius: 15px; position: relative; transition: all 0.2s; color: #666; cursor:pointer;}
         .course-btn:hover { background: rgba(0, 51, 102, 0.05); color: var(--primary); }
         .course-btn.active { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(0, 51, 102, 0.2); }
         .course-btn.active b { color: var(--secondary); }
+        
+        /* COMPORTAMIENTO MÓVIL (CARRUSEL) */
+        @media (max-width: 900px) { 
+          .main-content { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; } 
+          .hero-content { flex-direction: column; text-align: center; gap: 20px; } 
+          .timeline-line { left: 19px; } 
+          .date-circle { width: 40px; height: 40px; font-size: 0.7rem; }
+          
+          /* Transformación Mágica del Sidebar a Carrusel Horizontal */
+          .sidebar { 
+            order: -1; /* Pone los cursos ARRIBA del todo */
+            padding: 15px;
+            display: flex;
+            overflow-x: auto; /* Permite scroll lateral */
+            white-space: nowrap; /* Evita que los botones bajen */
+            gap: 15px;
+            background: transparent;
+            box-shadow: none;
+            backdrop-filter: none;
+            border: none;
+            scrollbar-width: none; /* Ocultar barra scroll en Firefox */
+          }
+          .sidebar::-webkit-scrollbar { display: none; /* Ocultar barra scroll en Chrome/Safari */ }
+          
+          .profile-header { display: none; /* Ocultamos el avatar gigante en móvil para ahorrar espacio */ }
+          
+          .course-btn {
+            min-width: 200px; /* Tarjetas anchas */
+            background: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            margin-bottom: 0;
+            display: inline-block; /* Necesario para scroll horizontal */
+            white-space: normal; /* Permite que el texto dentro de la tarjeta sí baje */
+          }
+          .course-btn.active {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.05);
+          }
+        }
 
         /* DASHBOARD */
         .hero-card { background: linear-gradient(135deg, #003366 0%, #004080 100%); color: white; padding: 40px; border-radius: 25px; position: relative; overflow: hidden; margin-bottom: 40px; box-shadow: 0 20px 40px rgba(0, 51, 102, 0.3); }
         .hero-card::before { content:''; position: absolute; top:0; right:0; width: 300px; height: 300px; background: url('https://www.transparenttextures.com/patterns/cube-coat.png'); opacity: 0.1; }
         .hero-content { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; }
         .hero-badge { background: var(--secondary); color: var(--primary); padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 15px; display: inline-block; }
-        .big-btn { background: var(--secondary); color: var(--primary); text-decoration: none; padding: 15px 40px; border-radius: 50px; font-weight: 800; font-size: 1.1rem; box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4); border: none; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: transform 0.2s; }
+        .big-btn { background: var(--secondary); color: var(--primary); text-decoration: none; padding: 15px 40px; border-radius: 50px; font-weight: 800; font-size: 1.1rem; box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform 0.2s; }
         .big-btn:hover { transform: scale(1.05); }
 
         /* TIMELINE */
@@ -217,8 +253,6 @@ const App = () => {
         .loading-screen, .error-screen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg); }
         .spinner { border: 4px solid rgba(0, 51, 102, 0.1); border-top: 4px solid var(--secondary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        @media (max-width: 900px) { .main-content { grid-template-columns: 1fr; } .hero-content { flex-direction: column; text-align: center; gap: 20px; } .sidebar { order: 2; } .timeline-line { left: 19px; } .date-circle { width: 40px; height: 40px; font-size: 0.7rem; } }
       `}</style>
       
       {/* LOGIN ADMIN MODAL */}
@@ -235,7 +269,7 @@ const App = () => {
         </div>
       )}
 
-      <div className="test-banner">⚠️ MODO LABORATORIO DE DISEÑO (v10.0 Modern UI)</div>
+      <div className="test-banner">⚠️ MODO LABORATORIO DE DISEÑO (v10.1 Mobile UX)</div>
 
       <header className="header">
         <div className="header-content">
@@ -275,9 +309,11 @@ const App = () => {
                 <div style={{fontSize:'0.8rem', color:'#888', marginTop:'5px'}}>ID: {docente.idReal}</div>
               </div>
               
-              <div style={{height:'1px', background:'#eee', margin:'20px 0'}}></div>
+              <div className="profile-header" style={{height:'1px', background:'#eee', margin:'20px 0'}}></div>
               
-              <h4 style={{margin:'0 0 15px', color:'#aaa', fontSize:'0.75rem', letterSpacing:'1px'}}>MIS ASIGNATURAS</h4>
+              {/* En móvil, este título ayuda a entender que hay scroll */}
+              <div style={{color:'#aaa', fontSize:'0.75rem', letterSpacing:'1px', marginBottom:'10px', display:'none'}} className="mobile-hint">DESLIZA PARA VER MÁS 👉</div>
+
               {docente.cursos.map((c, i) => (
                 <button key={i} onClick={()=>setSelectedCursoIdx(i)} className={`course-btn ${selectedCursoIdx === i ? 'active' : ''}`}>
                   <div style={{fontWeight:'bold', fontSize:'0.9rem'}}>{c.materia}</div>
@@ -325,7 +361,6 @@ const App = () => {
                 <h3 style={{color:'var(--primary)', borderBottom:'1px solid #eee', paddingBottom:'15px', marginTop:0}}>Cronograma de Actividades</h3>
                 
                 {cursoActivo && cursoActivo.semanas.map((s, idx) => {
-                  // Lógica visual simple: El primero de la lista es el "Activo" (Azul), los demás normales
                   const isActive = idx === 0; 
                   return (
                     <div key={idx} className={`timeline-item ${isActive ? 'active' : ''}`}>
@@ -355,12 +390,6 @@ const App = () => {
                     </div>
                   );
                 })}
-                
-                {(!cursoActivo || cursoActivo.semanas.length === 0) && (
-                   <div style={{textAlign:'center', padding:'40px', color:'#888'}}>
-                     No hay programación cargada para esta asignatura.
-                   </div>
-                )}
               </div>
             </section>
           </>
