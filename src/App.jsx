@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- CONFIGURACIÓN DE LABORATORIO SEGURA 🔒 ---
-// Tu URL del Script (La misma que ya tenías funcionando)
-const URL_SCRIPT_APPS = "https://script.google.com/macros/s/AKfycbzwqjbrBAsEPFDXSt7NqdW8AK201RJxLc8Szg-AphN2DZQ8yT-2AyRCxbGy9x5ape4H/exec";
+// --- ⚡ CONFIGURACIÓN DE VELOCIDAD EXTREMA (FIREBASE) ---
+// YA CONFIGURADA CON TU PROYECTO REAL:
+const FIREBASE_DB_URL = "https://portal-creo-db-default-rtdb.firebaseio.com/docentes/"; 
 
+// --- CONFIGURACIÓN DE LOGS (Asistencia silenciosa al Excel) ---
+const URL_SCRIPT_LOGS = "https://script.google.com/macros/s/AKfycbzwqjbrBAsEPFDXSt7NqdW8AK201RJxLc8Szg-AphN2DZQ8yT-2AyRCxbGy9x5ape4H/exec";
+
+// Links Admin
 const URL_TU_EXCEL_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/edit?gid=0#gid=0";
 const URL_EMBED_LOGS = "https://docs.google.com/spreadsheets/d/1flqOTBYG-cvXSR0xVv-0ilTP6i4MNoSdk5aVKQCKaSY/preview?gid=0";
 
 const WHATSAPP_NUMBER = "573106964025";
 const ADMIN_PASS = "admincreo"; 
 
-// --- COMPONENTE TOAST ---
 const Toast = ({ msg, show }) => (
   <div className={`toast-notification ${show ? 'show' : ''}`}>{msg}</div>
 );
@@ -19,7 +22,6 @@ const App = () => {
   const [view, setView] = useState('user'); 
   const [passInput, setPassInput] = useState('');
   
-  // Estado de carga y datos
   const [loading, setLoading] = useState(false); 
   const [searchTerm, setSearchTerm] = useState('');
   const [docente, setDocente] = useState(null); 
@@ -28,7 +30,6 @@ const App = () => {
   const [fechaActual, setFechaActual] = useState(new Date());
   const [toast, setToast] = useState({ show: false, msg: '' });
 
-  // --- EFECTO RELOJ ---
   useEffect(() => {
     const timer = setInterval(() => setFechaActual(new Date()), 1000);
     return () => clearInterval(timer);
@@ -46,12 +47,11 @@ const App = () => {
     setTimeout(() => setToast({ show: false, msg: '' }), 3000);
   };
 
-  // --- LOGS SILENCIOSOS (MODO NINJA 🥷) ---
   const registrarLog = (documento, accion) => {
-    // YA NO MOSTRAMOS TOAST AQUÍ. El usuario no se entera, pero se guarda.
+    // Log silencioso al Script de Google (Para que tú tengas el Excel de control)
     try {
-      const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: `[SECURE] ${accion}` };
-      fetch(URL_SCRIPT_APPS, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datosLog) }).catch(err => console.log(err));
+      const datosLog = { fecha: new Date().toLocaleString('es-CO'), doc: documento, estado: `[FIREBASE] ${accion}` };
+      fetch(URL_SCRIPT_LOGS, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datosLog) }).catch(err => console.log(err));
     } catch (e) { console.error(e); }
   };
 
@@ -67,7 +67,7 @@ const App = () => {
     return "Buenas noches";
   };
 
-  // --- BÚSQUEDA SEGURA (API) ---
+  // --- BÚSQUEDA ULTRARÁPIDA (FIREBASE) 🚀 ---
   const handleSearch = (e) => {
     e.preventDefault();
     const idBusqueda = searchTerm.replace(/\D/g, '');
@@ -80,18 +80,19 @@ const App = () => {
     setLoading(true);
     setDocente(null);
 
-    fetch(`${URL_SCRIPT_APPS}?id=${idBusqueda}`)
+    // CONSULTA DIRECTA A LA NUBE (0.2 segundos)
+    fetch(`${FIREBASE_DB_URL}${idBusqueda}.json`)
       .then(res => res.json())
-      .then(response => {
+      .then(data => {
         setLoading(false);
         
-        if (response.encontrado && response.data) {
-          const docenteData = response.data;
-          
-          docenteData.cursos = docenteData.cursos.map(curso => {
+        if (data) {
+          // Procesamos los datos que vienen de la nube
+          const cursosProcesados = data.cursos.map(curso => {
             const semanasProcesadas = [];
-            
-            curso.semanasRaw.forEach((texto, i) => {
+            const semanasRaw = curso.semanasRaw || [];
+
+            semanasRaw.forEach((texto, i) => {
                if (i >= 16) return; 
                if (!texto || texto.length < 5 || texto.startsWith("-") || texto.toLowerCase().includes("pendiente")) return;
 
@@ -152,20 +153,18 @@ const App = () => {
             return { ...curso, semanas: semanasProcesadas };
           });
 
-          setDocente(docenteData);
+          setDocente({ ...data, cursos: cursosProcesados });
           setSelectedCursoIdx(0);
-          // Quitamos también el toast de bienvenida para que sea más limpio, o lo dejamos si te gusta.
-          // showToast('✅ ¡Bienvenido!'); 
-          registrarLog(idBusqueda, '✅ Consulta Exitosa (Secure)');
+          registrarLog(idBusqueda, '✅ Consulta Exitosa (Firebase)');
 
         } else {
-          showToast('❌ Documento no encontrado o sin asignación');
+          showToast('❌ Documento no encontrado');
         }
       })
       .catch(err => {
         setLoading(false);
         console.error(err);
-        showToast('⚠️ Error de conexión segurizada');
+        showToast('⚠️ Error de conexión');
       });
   };
 
@@ -184,7 +183,7 @@ const App = () => {
       <div style={{fontFamily:'Segoe UI', background:'#f4f6f8', minHeight:'100vh', padding:'20px', display:'flex', flexDirection:'column', alignItems:'center'}}>
         <div className="fade-in-up" style={{maxWidth:'1000px', width:'100%', background:'white', padding:'30px', borderRadius:'20px', boxShadow:'0 20px 50px rgba(0,0,0,0.1)'}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:'20px'}}>
-            <h2 style={{color:'#003366', margin:0}}>PANEL ADMIN (MODO SEGURO)</h2>
+            <h2 style={{color:'#003366', margin:0}}>PANEL ADMIN</h2>
             <div style={{display:'flex', gap:'10px'}}>
                <a href={URL_TU_EXCEL_LOGS} target="_blank" rel="noreferrer" style={{background:'#27ae60', color:'white', textDecoration:'none', padding:'10px 20px', borderRadius:'30px', fontWeight:'bold'}}>Abrir Excel</a>
                <button onClick={()=>setView('user')} style={{cursor:'pointer', padding:'10px 20px', borderRadius:'30px', border:'1px solid #ddd'}}>⬅ Salir</button>
@@ -202,73 +201,53 @@ const App = () => {
       <style>{`
         :root { --primary: #003366; --secondary: #D4AF37; --orange: #FF6600; --bg: #F0F2F5; --text: #1A1A1A; --card-bg: #FFFFFF; --shadow: 0 10px 30px rgba(0,0,0,0.08); }
         body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
-        
-        /* ANIMACIONES */
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
-        
-        /* TOAST */
         .toast-notification { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: rgba(0,0,0,0.85); color: white; padding: 12px 24px; borderRadius: 50px; font-weight: bold; z-index: 9999; opacity: 0; transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.3); backdrop-filter: blur(5px); }
         .toast-notification.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
         .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); box-shadow: var(--shadow); border-radius: 20px; }
         .rounded-btn { border-radius: 50px; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
         .rounded-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        
-        .test-banner { background: linear-gradient(90deg, #16a085, #2ecc71); color: white; text-align: center; padding: 10px; font-weight: bold; font-size: 0.85rem; letter-spacing: 1px; }
-        
+        .test-banner { background: linear-gradient(90deg, #e67e22, #f39c12); color: white; text-align: center; padding: 10px; font-weight: bold; font-size: 0.85rem; letter-spacing: 1px; }
         .header { background: var(--primary); padding: 25px 0; position: relative; overflow: hidden; }
         .header::after { content:''; position: absolute; top:-50%; right:-10%; width: 600px; height: 600px; background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; pointer-events: none; }
         .header-content { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 10; }
         .brand h1 { margin: 0; color: var(--secondary); font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; } 
         .brand h2 { margin: 5px 0 0; font-size: 0.8rem; color: rgba(255,255,255,0.8); font-weight: 500; letter-spacing: 2px; text-transform: uppercase; }
-
         .search-container { background: white; padding: 5px; border-radius: 50px; display: flex; box-shadow: 0 5px 20px rgba(0,0,0,0.2); transition: transform 0.2s; }
         .search-container:hover { transform: scale(1.02); }
         .search-form input { padding: 12px 20px; border-radius: 50px; border: none; outline: none; font-size: 1rem; width: 200px; }
         .btn-search { background: var(--secondary); color: var(--primary); border: none; padding: 10px 30px; font-weight: 800; border-radius: 50px; text-transform: uppercase; letter-spacing: 1px; }
-
         .main-content { max-width: 1200px; margin: 40px auto; padding: 0 20px; display: grid; grid-template-columns: 320px 1fr; gap: 40px; }
-        
         .sidebar { padding: 30px; height: fit-content; animation: fadeInUp 0.5s ease-out; }
         .profile-header { text-align: center; margin-bottom: 30px; }
         .avatar { width: 90px; height: 90px; background: var(--secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--primary); font-weight: bold; margin: 0 auto 15px; box-shadow: 0 10px 20px rgba(212, 175, 55, 0.3); border: 4px solid white; }
-        
         .course-btn { width: 100%; padding: 15px 20px; margin-bottom: 12px; border: none; background: transparent; text-align: left; border-radius: 15px; position: relative; transition: all 0.2s; color: #666; cursor:pointer; border: 1px solid transparent; }
         .course-btn:hover { background: white; border-color: #eee; transform: translateX(5px); }
         .course-btn.active { background: white; border-color: var(--secondary); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
         .course-btn.active .bloque-badge { background: var(--primary); color: white; }
-        
         .bloque-badge { display: inline-block; font-size: 0.7rem; background: #eee; padding: 2px 8px; border-radius: 10px; margin-top: 5px; font-weight: bold; color: #555; transition: background 0.2s; }
-
         @media (max-width: 900px) { 
           .main-content { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; } 
           .sidebar { order: -1; padding: 15px; display: flex; overflow-x: auto; gap: 15px; background: transparent; box-shadow: none; border: none; scrollbar-width: none; animation: none; }
           .course-btn { min-width: 240px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-bottom: 0; white-space: normal; padding: 15px; }
           .course-btn.active { transform: scale(1.02); border: 2px solid var(--secondary); }
         }
-
         .hero-card { background: linear-gradient(135deg, #003366 0%, #004080 100%); color: white; padding: 40px; border-radius: 30px; position: relative; overflow: hidden; margin-bottom: 40px; box-shadow: 0 20px 40px rgba(0, 51, 102, 0.3); animation: fadeInUp 0.6s ease-out; }
         .hero-info-grid { display: flex; gap: 20px; margin-top: 25px; flex-wrap: wrap; background: rgba(0,0,0,0.25); padding: 15px 20px; border-radius: 15px; backdrop-filter: blur(5px); }
         .hero-info-item { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.95rem; color: rgba(255,255,255,0.9); }
-        
         .timeline-container { padding: 40px; background: white; border-radius: 30px; animation: fadeInUp 0.7s ease-out; }
         .timeline-item { display: flex; gap: 25px; margin-bottom: 30px; position: relative; }
         .timeline-line { position: absolute; left: 24px; top: 50px; bottom: -30px; width: 3px; background: #f0f0f0; z-index: 0; }
         .timeline-item:last-child .timeline-line { display: none; }
         .date-circle { width: 50px; height: 50px; background: #fff; border: 3px solid #eee; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; color: #aaa; z-index: 1; flex-shrink: 0; transition: all 0.3s; }
-        
         .timeline-content { flex: 1; background: #fcfcfc; padding: 25px; border-radius: 20px; border: 1px solid #f0f0f0; transition: all 0.3s; }
         .timeline-content:hover { background: white; border-color: var(--secondary); box-shadow: 0 15px 30px rgba(0,0,0,0.06); transform: translateX(5px); }
-        
         .zoom-mini-btn { display: inline-flex; align-items: center; gap: 8px; background: #2D8CFF; color: white; padding: 10px 20px; border-radius: 50px; text-decoration: none; font-size: 0.9rem; font-weight: bold; margin-top: 15px; box-shadow: 0 5px 15px rgba(45, 140, 255, 0.3); transition: transform 0.2s; }
         .zoom-mini-btn:hover { transform: translateY(-2px); }
-        
         .copy-icon { cursor: pointer; opacity: 0.6; transition: opacity 0.2s; font-size: 1.1rem; }
         .copy-icon:hover { opacity: 1; transform: scale(1.1); }
-
         .offline-badge { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 8px 15px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; margin-top: 10px; border: 1px solid rgba(21, 101, 192, 0.1); }
-
         .whatsapp-btn { position: fixed; bottom: 30px; right: 30px; background: #25D366; color: white; padding: 15px 25px; border-radius: 50px; text-decoration: none; font-weight: bold; box-shadow: 0 10px 30px rgba(37, 211, 102, 0.4); z-index: 100; display: flex; align-items: center; gap: 10px; transition: transform 0.2s; }
         .loading-screen, .error-screen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg); }
         .spinner { border: 4px solid rgba(0, 51, 102, 0.1); border-top: 4px solid var(--secondary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
@@ -289,7 +268,7 @@ const App = () => {
         </div>
       )}
 
-      <div className="test-banner">🔒 MODO SEGURO v17.0 (Logs Silenciosos)</div>
+      <div className="test-banner">🔥 MODO FIREBASE (Velocidad Extrema)</div>
 
       <header className="header">
         <div className="header-content">
@@ -314,9 +293,9 @@ const App = () => {
           <div className="glass-panel fade-in-up" style={{gridColumn:'1 / -1', textAlign:'center', padding:'100px 20px', position:'relative', overflow:'hidden'}}>
              <div style={{position:'absolute', top:'-50px', left:'50%', transform:'translateX(-50%)', width:'300px', height:'300px', background:'radial-gradient(circle, rgba(212, 175, 55, 0.1) 0%, rgba(0,0,0,0) 70%)', borderRadius:'50%'}}></div>
             <div style={{fontSize:'5rem', marginBottom:'20px', animation:'fadeInUp 1s'}}>👨‍🏫</div>
-            <h1 style={{color:'var(--primary)', marginBottom:'15px', fontSize:'2.5rem'}}>Portal Docente Seguro</h1>
+            <h1 style={{color:'var(--primary)', marginBottom:'15px', fontSize:'2.5rem'}}>Portal Docente</h1>
             <p style={{color:'#666', maxWidth:'600px', margin:'0 auto', fontSize:'1.1rem', lineHeight:'1.6'}}>
-              Gestiona tu programación académica de forma privada y segura.
+              Gestiona tu programación académica de forma privada, segura y ultra-rápida.
             </p>
             <div style={{marginTop:'40px', fontSize:'1.2rem', color:'#333', fontWeight:'bold'}}>
               {formatoFechaHora().fecha}
